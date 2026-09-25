@@ -1,6 +1,12 @@
 # Project Progress & State Log
 
-> Single source of truth across development sessions. Read this file at the start of every session before touching code. Update it at the end of every module.
+> Single source of truth across development sessions. Read this file and `IMPLEMENTATION_PLAN.md` at the start of every session before touching code. Update this file at the end of every module.
+
+- **Architecture & Roadmap Blueprint:** [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md)
+- **Database Schema Source:** [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)
+- **API Map:** [`API_DESIGN.md`](./API_DESIGN.md)
+- **Core Algorithms:** [`APP_LOGIC.md`](./APP_LOGIC.md)
+- **Traceability Matrix:** [`TRACEABILITY_MATRIX.md`](./TRACEABILITY_MATRIX.md)
 
 ---
 
