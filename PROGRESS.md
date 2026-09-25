@@ -89,6 +89,17 @@ This baseline documents core architectural decisions from the project specificat
 
 ---
 
-## 3. Resume State & Next Step
-- **Current Position:** Pre-implementation / Planning approved.
-- **Next Step:** Execute Module 1: Foundation (D1 migrations setup, seed data script, WebAuthn session middleware, Hono Worker structure).
+## 3. Environment & Remote Setup State
+- **GitHub Repository:** [`https://github.com/ChidiebereJohn-ng/financial-steward.git`](https://github.com/ChidiebereJohn-ng/financial-steward.git) (Branch: `main`)
+- **Cloudflare Account:** `Chidieberejohnchukwuemeka@gmail.com's Account` (`95d2ef3d029c783cdccf9f223d30e123`)
+- **CLI Tooling:** Wrangler v4.83.0 authenticated, Git configured.
+
+---
+
+## 4. Resume State & Next Step
+- **Current Position:** Environment linked (Cloudflare + GitHub), Pre-implementation approved.
+- **Next Step:** Begin Module 1 (Foundation):
+  1. Scaffold project structure (`package.json`, `tsconfig.json`, `wrangler.toml`).
+  2. Create D1 database (`wrangler d1 create finance-app-db`).
+  3. Create migration `0001_foundation.sql` (reference & config tables + seeds).
+  4. Build base Hono Worker router, WebAuthn middleware with dev bypass, and foundation test suite.
