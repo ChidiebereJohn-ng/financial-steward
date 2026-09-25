@@ -1,0 +1,26 @@
+{
+  "name": "financial-steward",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "d1:migrate:local": "wrangler d1 migrations apply finance-app-db --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply finance-app-db --remote"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260925.1",
+    "@types/node": "^22.13.0",
+    "@types/sql.js": "^1.4.9",
+    "sql.js": "^1.12.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5",
+    "wrangler": "^4.83.0"
+  }
+}

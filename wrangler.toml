@@ -1,0 +1,20 @@
+name = "personal-finance-app"
+main = "worker/index.ts"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "finance-app-db"
+database_id = "820fc652-b2c7-46db-9eb5-b9d504701b7a"
+migrations_dir = "worker/migrations"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "a501583e975c4424ba3eb6a31abc1c2d"
+
+[triggers]
+crons = [
+  "0 1 * * *",      # nightly: net worth snapshot, monthly_summaries refresh
+  "0 6 * * 1",      # weekly Monday: research digest generation
+  "0 7 * * *"       # daily: recurring transaction due-check
+]

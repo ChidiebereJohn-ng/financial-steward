@@ -78,7 +78,7 @@ This baseline documents core architectural decisions from the project specificat
 
 | # | Module | Status | Last Applied Migration | Test Suite State | Key Outputs |
 |---|---|---|---|---|---|
-| 1 | **Foundation** (D1 Schema + Seed, WebAuthn, Base Hono Worker) | **Not Started** | None | Not Started | — |
+| 1 | **Foundation** (D1 Schema + Seed, WebAuthn, Base Hono Worker) | **Completed** | `0001_foundation.sql` | 12/12 Passing | Live D1 `finance-app-db`, KV `CACHE`, Deployed Worker API |
 | 2 | **Ledger + Allocation Engine** (Core Math, Bucket Ledger, Transfers) | **Not Started** | None | Not Started | — |
 | 3 | **Two Dashboards** (Financial Health + Money Movement) | **Not Started** | None | Not Started | — |
 | 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Not Started** | None | Not Started | — |
@@ -92,14 +92,26 @@ This baseline documents core architectural decisions from the project specificat
 ## 3. Environment & Remote Setup State
 - **GitHub Repository:** [`https://github.com/ChidiebereJohn-ng/financial-steward.git`](https://github.com/ChidiebereJohn-ng/financial-steward.git) (Branch: `main`)
 - **Cloudflare Account:** `Chidieberejohnchukwuemeka@gmail.com's Account` (`95d2ef3d029c783cdccf9f223d30e123`)
-- **CLI Tooling:** Wrangler v4.83.0 authenticated, Git configured.
+- **Cloudflare D1 Database:** `finance-app-db` (`820fc652-b2c7-46db-9eb5-b9d504701b7a`)
+- **Cloudflare KV Namespace:** `CACHE` (`a501583e975c4424ba3eb6a31abc1c2d`)
+- **Deployed Worker Endpoint:** `https://personal-finance-app.chidieberejohnchukwuemeka.workers.dev`
 
 ---
 
-## 4. Resume State & Next Step
-- **Current Position:** Environment linked (Cloudflare + GitHub), Pre-implementation approved.
-- **Next Step:** Begin Module 1 (Foundation):
-  1. Scaffold project structure (`package.json`, `tsconfig.json`, `wrangler.toml`).
-  2. Create D1 database (`wrangler d1 create finance-app-db`).
-  3. Create migration `0001_foundation.sql` (reference & config tables + seeds).
-  4. Build base Hono Worker router, WebAuthn middleware with dev bypass, and foundation test suite.
+## 4. Key Decisions & Technical Notes (Module 1)
+- **WASM SQLite for Local Testing:** Replaced `better-sqlite3` with `sql.js` (WebAssembly SQLite) to eliminate reliance on native C++ compilers on Windows Node v25, enabling instantaneous and deterministic test execution in any environment.
+- **Reference Table Constraints:**
+  - `Seed` category explicitly set to `bucket_is_flexible = 1` and `default_bucket_id = NULL`.
+  - `Offering` category set to `bucket_is_flexible = 0` and defaulted to `expense` bucket.
+  - Initial rule version 1 seeded (10% Tithe, 20% Kingdom, 20% Savings, 20% Invest, 10% Charity, 50% Expense).
+- **Authentication:** Added `authMiddleware` supporting WebAuthn session cookies/Bearer tokens with KV verification, along with a dev bypass header (`x-dev-bypass: true`) for testing without biometric hardware.
+
+---
+
+## 5. Resume State & Next Step
+- **Current Position:** Module 1: Foundation complete, tested (12/12 passing), and deployed to Cloudflare Edge.
+- **Last Applied Migration:** `0001_foundation.sql` (applied remotely to `finance-app-db`).
+- **Next Step:** Module 2: Ledger + Allocation Engine
+  - Author migration `0002_ledger_allocation.sql` (`transactions`, `allocation_runs`, `bucket_ledger_entries`, `bucket_transfers`, `transaction_audit_log`).
+  - Implement core algorithms: `runAllocation()`, `recordExpense()`, `transferBetweenBuckets()`, `editTransaction()`.
+  - Write rigorous math and ledger immutability tests.
