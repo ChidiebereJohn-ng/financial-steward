@@ -139,3 +139,80 @@ export interface BucketWithBalance {
   is_pass_through: number;
   balance: number;
 }
+
+export interface MonthlySummary {
+  id: number;
+  month: string;
+  category_id: number | null;
+  bucket_id: number | null;
+  total_amount: number;
+  refreshed_at: string;
+}
+
+export interface NetWorthSnapshot {
+  id: number;
+  date: string;
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+  base_currency: string;
+  created_at: string;
+}
+
+export interface FxRate {
+  id: number;
+  date: string;
+  from_currency: string;
+  to_currency: string;
+  rate: number;
+  created_at: string;
+}
+
+export interface HealthDashboardData {
+  net_worth_current: number;
+  net_worth_trend: Array<{ date: string; net_worth: number; total_assets: number; total_liabilities: number }>;
+  savings_invest_rate: {
+    this_month_pct: number;
+    last_month_pct: number;
+    change_pct: number;
+  };
+  allocation_waterfall: {
+    month: string;
+    gross_inflow: number;
+    splits: Record<string, number>;
+  };
+  budget_adherence_summary: {
+    overall_adherence_pct: number;
+    categories: Array<{
+      category_id: number;
+      category_name: string;
+      planned: number;
+      actual: number;
+      variance_pct: number;
+    }>;
+    worst_offenders: Array<{
+      category_id: number;
+      category_name: string;
+      planned: number;
+      actual: number;
+      overage_amount: number;
+      variance_pct: number;
+    }>;
+  };
+  runway: {
+    expenses_balance: number;
+    avg_daily_burn: number;
+    runway_days: number;
+  };
+}
+
+export interface LedgerDashboardData {
+  buckets: BucketWithBalance[];
+  daily_series: Array<{
+    date: string;
+    inflow: number;
+    outflow: number;
+  }>;
+  recent_transactions: Array<Transaction & { category_name?: string; bucket_name?: string; account_name?: string }>;
+}
+

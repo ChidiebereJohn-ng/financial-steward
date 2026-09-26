@@ -86,7 +86,7 @@ This baseline documents core architectural decisions from the project specificat
 |---|---|---|---|---|---|
 | 1 | **Foundation** (D1 Schema + Seed, WebAuthn, Base Hono Worker) | **Completed** | `0001_foundation.sql` | 12/12 Passing | Live D1 `finance-app-db`, KV `CACHE`, Deployed Worker API |
 | 2 | **Ledger + Allocation Engine** (Core Math, Bucket Ledger, Transfers) | **Completed** | `0002_ledger_allocation.sql` | 26/26 Passing | Core Ledger Schema, Waterfall Engine, Transfers, Reversal Immutability, Deployed API |
-| 3 | **Two Dashboards** (Financial Health + Money Movement) | **Not Started** | None | Not Started | — |
+| 3 | **Two Dashboards** (Financial Health + Money Movement) | **Completed** | `0003_dashboards.sql` | 35/35 Passing | Precomputed Summaries, Net Worth Engine, Health & Ledger APIs, Nightly Cron Handler, React PWA Shell & Dashboards, Deployed API |
 | 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Not Started** | None | Not Started | — |
 | 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Not Started** | None | Not Started | — |
 | 6 | **Investor Module** (Holdings, NGX Manual, Live Crypto, Simulator) | **Not Started** | None | Not Started | — |
@@ -123,13 +123,24 @@ This baseline documents core architectural decisions from the project specificat
 - **Dynamic Scalar Balance:** There is no stored balance column on `allocation_buckets`. Live available balances are derived dynamically via:
   $$\text{Balance} = \sum(\text{allocation\_credit} + \text{transfer\_in}) - \sum(\text{expense\_debit} + \text{transfer\_out}) \pm \text{manual\_adjustment}$$
 
+### 4.3 Two Dashboards & Analytics Engine (Module 3)
+- **Precomputed Monthly Summaries (`monthly_summaries`):** Outflow categories and bucket allocations are precomputed by `refreshMonthlySummaries(db, month)` to accelerate dashboard response times. An atomic delete-and-reinsert batch pattern is used to guarantee idempotency and avoid stale rows on re-categorization or edits.
+- **Multi-Currency Net Worth Engine (`computeNetWorth`):** Net worth aggregates foreign and local accounts, bucket balances, and investment valuations, converted to base currency (`NGN`) using the closest prior historical exchange rate from `fx_rates`. Defensive queries allow the engine to run smoothly before investment and liability tables are formally introduced.
+- **Honest Metrics Design:**
+  - Health Dashboard replaces opaque composite scores with an honest KPI quartet: Total Net Worth, Savings & Investment Rate (% this month vs. last month), Paired Budget Adherence, and Expenses Runway.
+  - Paired Adherence Invariant: Budget adherence percentage is strictly rendered alongside the category variance list and worst 3 offenders.
+  - Runway Indicator: Computed dynamically as $\text{Expenses Bucket Balance} / \text{Average Daily Outflow (past 30 days)}$ in days.
+- **Cloudflare Scheduled Cron Handler:** Worker exports `handleScheduled(event, env, ctx)` responding to `"0 1 * * *"` to automatically recompute net worth snapshots and refresh monthly summaries nightly at 01:00 UTC.
+- **Frontend PWA Architecture:** React 19 + TypeScript + Vite PWA in `/app` with responsive layout shell (desktop side navigation + mobile bottom navigation), design tokens for dark mode and the 6 bucket colors, shared `<ChartCard>` (Chart.js) and `<BucketBadge>` components, Screen 1 (Financial Health), and Screen 2 (Money Movement).
+
 ---
 
 ## 5. Resume State & Next Step
-- **Current Position:** Module 2: Ledger + Allocation Engine complete, tested (26/26 passing), applied locally and remotely to `finance-app-db`, and deployed to Cloudflare Edge.
-- **Last Applied Migration:** `0002_ledger_allocation.sql` (applied remotely to `finance-app-db`).
-- **Next Step:** Module 3: Two Dashboards (Financial Health vs. Money Movement)
-  - Author migration `0003_dashboards.sql` (`monthly_summaries`, `net_worth_snapshots`, `fx_rates`).
-  - Implement scheduled cron handlers for nightly summaries refresh and net worth snapshots.
-  - Implement `GET /api/dashboard/health` and `GET /api/dashboard/ledger`.
-  - Begin Frontend PWA foundation and dashboard screens.
+- **Current Position:** Module 3: Two Dashboards (Financial Health vs. Money Movement) complete, tested (35/35 passing), applied locally and remotely to `finance-app-db`, and deployed to Cloudflare Edge.
+- **Last Applied Migration:** `0003_dashboards.sql` (applied remotely to `finance-app-db`).
+- **Next Step:** Module 4: Budgets
+  - Author migration `0004_budgets.sql` (`budgets` table with `UNIQUE(month, category_id)`).
+  - Implement `getBudgetVariance(month)` and `getOverallAdherence(month)`.
+  - Implement `GET /api/budgets`, `POST /api/budgets`, and `GET /api/budgets/trend`.
+  - Build Screen 5: Budgets (Month selector, paired adherence header, planned-vs-actual chart, MoM trend line).
+
