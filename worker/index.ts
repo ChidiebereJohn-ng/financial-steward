@@ -1,12 +1,14 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { Env } from './types';
+import type { AppVariables, Env } from './types';
 import { errorHandler } from './middleware/error';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
 import referenceRoutes from './routes/reference';
+import transactionsRoutes from './routes/transactions';
+import bucketsRoutes from './routes/buckets';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
 // Global CORS & Error Handler
 app.use('*', cors({
@@ -23,7 +25,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'ok',
     app: 'Financial Steward API',
-    module: 'Module 1: Foundation',
+    module: 'Module 2: Ledger + Allocation Engine',
     timestamp: new Date().toISOString()
   });
 });
@@ -34,6 +36,8 @@ app.use('/api/*', authMiddleware);
 // Route mounts
 app.route('/api/auth', authRoutes);
 app.route('/api', referenceRoutes);
+app.route('/api/transactions', transactionsRoutes);
+app.route('/api/buckets', bucketsRoutes);
 
 // Fallback 404
 app.notFound((c) => {

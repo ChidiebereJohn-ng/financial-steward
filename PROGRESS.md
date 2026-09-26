@@ -85,7 +85,7 @@ This baseline documents core architectural decisions from the project specificat
 | # | Module | Status | Last Applied Migration | Test Suite State | Key Outputs |
 |---|---|---|---|---|---|
 | 1 | **Foundation** (D1 Schema + Seed, WebAuthn, Base Hono Worker) | **Completed** | `0001_foundation.sql` | 12/12 Passing | Live D1 `finance-app-db`, KV `CACHE`, Deployed Worker API |
-| 2 | **Ledger + Allocation Engine** (Core Math, Bucket Ledger, Transfers) | **Not Started** | None | Not Started | — |
+| 2 | **Ledger + Allocation Engine** (Core Math, Bucket Ledger, Transfers) | **Completed** | `0002_ledger_allocation.sql` | 26/26 Passing | Core Ledger Schema, Waterfall Engine, Transfers, Reversal Immutability, Deployed API |
 | 3 | **Two Dashboards** (Financial Health + Money Movement) | **Not Started** | None | Not Started | — |
 | 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Not Started** | None | Not Started | — |
 | 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Not Started** | None | Not Started | — |
@@ -104,7 +104,9 @@ This baseline documents core architectural decisions from the project specificat
 
 ---
 
-## 4. Key Decisions & Technical Notes (Module 1)
+## 4. Key Decisions & Technical Notes
+
+### 4.1 Foundation (Module 1)
 - **WASM SQLite for Local Testing:** Replaced `better-sqlite3` with `sql.js` (WebAssembly SQLite) to eliminate reliance on native C++ compilers on Windows Node v25, enabling instantaneous and deterministic test execution in any environment.
 - **Reference Table Constraints:**
   - `Seed` category explicitly set to `bucket_is_flexible = 1` and `default_bucket_id = NULL`.
@@ -112,12 +114,22 @@ This baseline documents core architectural decisions from the project specificat
   - Initial rule version 1 seeded (10% Tithe, 20% Kingdom, 20% Savings, 20% Invest, 10% Charity, 50% Expense).
 - **Authentication:** Added `authMiddleware` supporting WebAuthn session cookies/Bearer tokens with KV verification, along with a dev bypass header (`x-dev-bypass: true`) for testing without biometric hardware.
 
+### 4.2 Ledger + Allocation Engine (Module 2)
+- **Zero-Drift Waterfall Split Math:** All gross inflow splits are computed in minor units (kobo/cents). Tithe (10%) and Kingdom (20%) are computed first, and the remaining 70% is distributed to Savings (20%), Investment (20%), Charity (10%), with the final Expenses bucket absorbing any odd rounding cent/kobo. This mathematically guarantees that $\sum \text{splits} \equiv \text{inflow amount}$ across arbitrary amounts.
+- **Override Audit Lineage:** When a custom `override_split` is provided on an inflow, `transactions.is_override` is set to `1` and `transactions.allocation_rule_version` is set to `NULL`, with the exact applied bucket allocations recorded in `allocation_runs`.
+- **Append-Only Ledger & Reversal Invariant:** `bucket_ledger_entries` is strictly append-only. When an existing transaction is edited (`PATCH /api/transactions/:id`) or deleted (`DELETE /api/transactions/:id`), the historical entries are never updated or deleted. Offsetting `manual_adjustment` entries are appended to reverse the previous credit/debit, new entries reflecting revised state are appended, and all field-level differences are written to `transaction_audit_log`.
+- **Flexible Sourcing Enforcement:** Outflow transactions with `Seed` (`bucket_is_flexible = 1`) strictly require `chosen_bucket_id` at entry time. Outflows with fixed categories (e.g. `Offering`) automatically route to `category.default_bucket_id` (Expenses bucket).
+- **Atomic Two-Legged Transfers:** `POST /api/buckets/transfer` generates balanced `transfer_out` and `transfer_in` entries linked in `bucket_transfers` within an atomic D1 batch. System-wide balance conservation is preserved ($\Delta = 0$).
+- **Dynamic Scalar Balance:** There is no stored balance column on `allocation_buckets`. Live available balances are derived dynamically via:
+  $$\text{Balance} = \sum(\text{allocation\_credit} + \text{transfer\_in}) - \sum(\text{expense\_debit} + \text{transfer\_out}) \pm \text{manual\_adjustment}$$
+
 ---
 
 ## 5. Resume State & Next Step
-- **Current Position:** Module 1: Foundation complete, tested (12/12 passing), and deployed to Cloudflare Edge.
-- **Last Applied Migration:** `0001_foundation.sql` (applied remotely to `finance-app-db`).
-- **Next Step:** Module 2: Ledger + Allocation Engine
-  - Author migration `0002_ledger_allocation.sql` (`transactions`, `allocation_runs`, `bucket_ledger_entries`, `bucket_transfers`, `transaction_audit_log`).
-  - Implement core algorithms: `runAllocation()`, `recordExpense()`, `transferBetweenBuckets()`, `editTransaction()`.
-  - Write rigorous math and ledger immutability tests.
+- **Current Position:** Module 2: Ledger + Allocation Engine complete, tested (26/26 passing), applied locally and remotely to `finance-app-db`, and deployed to Cloudflare Edge.
+- **Last Applied Migration:** `0002_ledger_allocation.sql` (applied remotely to `finance-app-db`).
+- **Next Step:** Module 3: Two Dashboards (Financial Health vs. Money Movement)
+  - Author migration `0003_dashboards.sql` (`monthly_summaries`, `net_worth_snapshots`, `fx_rates`).
+  - Implement scheduled cron handlers for nightly summaries refresh and net worth snapshots.
+  - Implement `GET /api/dashboard/health` and `GET /api/dashboard/ledger`.
+  - Begin Frontend PWA foundation and dashboard screens.

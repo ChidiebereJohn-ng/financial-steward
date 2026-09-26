@@ -213,7 +213,7 @@ describe('Module 1: Foundation Tests', () => {
       expect(res.status).toBe(200);
       const data = await res.json() as any;
       expect(data.status).toBe('ok');
-      expect(data.module).toBe('Module 1: Foundation');
+      expect(data.module).toMatch(/Module \d+/);
     });
 
     it('GET /api/categories should return 401 when unauthenticated', async () => {

@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { AppVariables, Env } from '../types';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
 // GET /api/auth/me — Check authentication status
 app.get('/me', async (c) => {
-  const user = c.get('user' as any);
+  const user = c.get('user');
   if (!user) {
     return c.json({ authenticated: false }, 401);
   }

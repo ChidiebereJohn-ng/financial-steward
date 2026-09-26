@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
-import type { Env } from '../types';
+import type { AppVariables, Env } from '../types';
 
-export const authMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+export const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: AppVariables }> = async (c, next) => {
   // Allow health check and auth routes without authentication
   const path = c.req.path;
   if (path === '/api/health' || path.startsWith('/api/auth/')) {
