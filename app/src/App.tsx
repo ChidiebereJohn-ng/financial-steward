@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigation, NavTab } from './components/Navigation';
 import { HealthDashboard } from './screens/HealthDashboard';
 import { LedgerDashboard } from './screens/LedgerDashboard';
+import { BudgetsScreen } from './screens/BudgetsScreen';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('health');
@@ -19,12 +20,7 @@ export const App: React.FC = () => {
             <p>Scheduled for Module 6: NGX manual prices, live crypto, and staged compounding simulator.</p>
           </div>
         )}
-        {activeTab === 'budgets' && (
-          <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Budgets & Goals</h2>
-            <p>Scheduled for Module 4: Category planned amounts, adherence trends, and goal tracking.</p>
-          </div>
-        )}
+        {activeTab === 'budgets' && <BudgetsScreen />}
         {activeTab === 'more' && (
           <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>More Tools & Settings</h2>

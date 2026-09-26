@@ -216,3 +216,48 @@ export interface LedgerDashboardData {
   recent_transactions: Array<Transaction & { category_name?: string; bucket_name?: string; account_name?: string }>;
 }
 
+export interface Budget {
+  id: number;
+  month: string;
+  category_id: number;
+  planned_amount: number;
+  created_at: string;
+}
+
+export interface BudgetVarianceItem {
+  category_id: number;
+  category_name: string;
+  bucket_id?: number | null;
+  bucket_key?: string | null;
+  planned: number;
+  actual: number;
+  variance_pct: number;
+  overage_amount: number;
+  status: 'under' | 'warning' | 'over';
+}
+
+export interface WorstOffender {
+  category_id: number;
+  category_name: string;
+  planned: number;
+  actual: number;
+  overage_amount: number;
+  variance_pct: number;
+}
+
+export interface OverallAdherenceResult {
+  month: string;
+  overall_adherence_pct: number;
+  total_planned: number;
+  total_actual: number;
+  categories: BudgetVarianceItem[];
+  worst_offenders: WorstOffender[];
+}
+
+export interface BudgetTrendItem {
+  month: string;
+  overall_adherence_pct: number;
+  total_planned: number;
+  total_actual: number;
+}
+

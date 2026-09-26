@@ -9,6 +9,7 @@ import transactionsRoutes from './routes/transactions';
 import bucketsRoutes from './routes/buckets';
 import dashboardsRoutes from './routes/dashboards';
 import netWorthRoutes from './routes/networth';
+import budgetsRoutes from './routes/budgets';
 import { refreshMonthlySummaries, computeNetWorth } from './lib/analytics';
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -28,7 +29,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'ok',
     app: 'Financial Steward API',
-    module: 'Module 3: Two Dashboards (Financial Health vs. Money Movement)',
+    module: 'Module 4: Budgets (Adherence %, Category Variance, Charts)',
     timestamp: new Date().toISOString()
   });
 });
@@ -43,6 +44,7 @@ app.route('/api/transactions', transactionsRoutes);
 app.route('/api/buckets', bucketsRoutes);
 app.route('/api/dashboard', dashboardsRoutes);
 app.route('/api/net-worth', netWorthRoutes);
+app.route('/api/budgets', budgetsRoutes);
 
 // Fallback 404
 app.notFound((c) => {

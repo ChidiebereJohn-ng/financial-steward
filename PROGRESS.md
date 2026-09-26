@@ -87,7 +87,7 @@ This baseline documents core architectural decisions from the project specificat
 | 1 | **Foundation** (D1 Schema + Seed, WebAuthn, Base Hono Worker) | **Completed** | `0001_foundation.sql` | 12/12 Passing | Live D1 `finance-app-db`, KV `CACHE`, Deployed Worker API |
 | 2 | **Ledger + Allocation Engine** (Core Math, Bucket Ledger, Transfers) | **Completed** | `0002_ledger_allocation.sql` | 26/26 Passing | Core Ledger Schema, Waterfall Engine, Transfers, Reversal Immutability, Deployed API |
 | 3 | **Two Dashboards** (Financial Health + Money Movement) | **Completed** | `0003_dashboards.sql` | 35/35 Passing | Precomputed Summaries, Net Worth Engine, Health & Ledger APIs, Nightly Cron Handler, React PWA Shell & Dashboards, Deployed API |
-| 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Not Started** | None | Not Started | — |
+| 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Completed** | `0004_budgets.sql` | 55/55 Passing | Budgets Table, Exact Clamped Adherence Math, Paired Non-Isolation Invariant, Copy Previous Month, Screen 5 Budgets, Deployed API |
 | 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Not Started** | None | Not Started | — |
 | 6 | **Investor Module** (Holdings, NGX Manual, Live Crypto, Simulator) | **Not Started** | None | Not Started | — |
 | 7 | **Purchase Calculator, Research Digest, CSV Export** | **Not Started** | None | Not Started | — |
@@ -133,14 +133,31 @@ This baseline documents core architectural decisions from the project specificat
 - **Cloudflare Scheduled Cron Handler:** Worker exports `handleScheduled(event, env, ctx)` responding to `"0 1 * * *"` to automatically recompute net worth snapshots and refresh monthly summaries nightly at 01:00 UTC.
 - **Frontend PWA Architecture:** React 19 + TypeScript + Vite PWA in `/app` with responsive layout shell (desktop side navigation + mobile bottom navigation), design tokens for dark mode and the 6 bucket colors, shared `<ChartCard>` (Chart.js) and `<BucketBadge>` components, Screen 1 (Financial Health), and Screen 2 (Money Movement).
 
+### 4.4 Budgets & Adherence Engine (Module 4)
+- **Mathematical Adherence & Clamping Invariant:**
+  Adherence percentage strictly computes:
+  $$\text{Adherence \%} = 100 - \max\left(0, \frac{\text{Total Actual} - \text{Total Planned}}{\text{Total Planned}} \times 100\right)$$
+  Clamped non-negatively at $0\%$ so catastrophic overages can never produce negative percentages. When total planned is 0, adherence defaults to $100\%$ if no funds were spent, or $0\%$ if unbudgeted outflows occurred.
+- **Mandatory Paired Presentation Invariant:**
+  `overall_adherence_pct` is strictly paired with the full category breakdown and the top 3 worst overage offenders in both API payloads and UI components. It is never exposed as a standalone badge or gamified score.
+- **D1 Migration `0004_budgets.sql`:**
+  Created `budgets` table (`id`, `month`, `category_id`, `planned_amount`, `created_at`, `UNIQUE(month, category_id)`) with supporting index `idx_budgets_month_category`. Applied both locally and remotely to `finance-app-db`.
+- **Copy Previous Month Budget:**
+  `copyPreviousMonthBudget(db, targetMonth)` calculates $M - 1$ (handling January to prior-year December boundaries) and upserts planned amounts idempotently into the target month.
+- **Month-over-Month Adherence Trend:**
+  `getBudgetTrend(db, fromMonth, toMonth)` produces chronological historical adherence data points for trend tracking across months.
+- **Screen 5 (Budgets UI):**
+  Built `app/src/screens/BudgetsScreen.tsx` featuring month stepper/selector, honest KPI summary row, paired worst offenders callout banner, FinanceAI-style rounded bar comparison chart (Planned vs. Actual spend), smooth adherence trend line chart, and an interactive category variance table with inline editing and one-click budget persistence. Mounted under the "Budgets & Goals" navigation tab.
+
 ---
 
 ## 5. Resume State & Next Step
-- **Current Position:** Module 3: Two Dashboards (Financial Health vs. Money Movement) complete, tested (35/35 passing), applied locally and remotely to `finance-app-db`, and deployed to Cloudflare Edge.
-- **Last Applied Migration:** `0003_dashboards.sql` (applied remotely to `finance-app-db`).
-- **Next Step:** Module 4: Budgets
-  - Author migration `0004_budgets.sql` (`budgets` table with `UNIQUE(month, category_id)`).
-  - Implement `getBudgetVariance(month)` and `getOverallAdherence(month)`.
-  - Implement `GET /api/budgets`, `POST /api/budgets`, and `GET /api/budgets/trend`.
-  - Build Screen 5: Budgets (Month selector, paired adherence header, planned-vs-actual chart, MoM trend line).
+- **Current Position:** Module 4: Budgets (Adherence %, Category Variance, Charts) complete, tested (55/55 passing), applied locally and remotely to `finance-app-db`, and deployed to Cloudflare Edge.
+- **Last Applied Migration:** `0004_budgets.sql` (applied locally and remotely to `finance-app-db`).
+- **Next Step:** Module 5: Goals, Liabilities, Recurring Transactions & Reconciliation
+  - Author migration `worker/migrations/0005_commitments.sql` (`goals`, `liabilities`, `recurring_transactions`).
+  - Implement `reconcileAccount(accountId, actualBalance, date)`.
+  - Implement recurring commitment due-scan logic in scheduled cron handler.
+  - Implement `GET/POST/PATCH /api/goals`, `GET/POST/PATCH /api/liabilities`, `GET/POST/PATCH /api/recurring`, and `POST /api/accounts/:id/reconcile`.
+  - Build Screen 6 (Goals with bucket-linked progress), Screen 9 (Liabilities payment cards), and Account reconciliation UI.
 
