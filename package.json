@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "vite",
+    "dev:worker": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",

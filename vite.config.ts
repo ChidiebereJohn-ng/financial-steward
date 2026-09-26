@@ -12,8 +12,9 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        target: process.env.VITE_API_URL || 'https://personal-finance-app.chidieberejohnchukwuemeka.workers.dev',
         changeOrigin: true,
+        secure: true,
       },
     },
   },
