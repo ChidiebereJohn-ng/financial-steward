@@ -214,6 +214,7 @@ export interface LedgerDashboardData {
     outflow: number;
   }>;
   recent_transactions: Array<Transaction & { category_name?: string; bucket_name?: string; account_name?: string }>;
+  upcoming_commitments?: RecurringWithDue[];
 }
 
 export interface Budget {
@@ -259,5 +260,72 @@ export interface BudgetTrendItem {
   overall_adherence_pct: number;
   total_planned: number;
   total_actual: number;
+}
+
+// Module 5: Commitments & Reconciliation
+export interface Goal {
+  id: number;
+  name: string;
+  target_amount: number;
+  target_date: string | null;
+  linked_bucket_id: number | null;
+  created_at: string;
+}
+
+export interface GoalWithProgress extends Goal {
+  linked_bucket_key?: string | null;
+  linked_bucket_name?: string | null;
+  current_amount: number;
+  progress_pct: number;
+  remaining_amount: number;
+}
+
+export interface Liability {
+  id: number;
+  name: string;
+  type: string;
+  principal: number;
+  current_balance: number;
+  interest_rate: number | null;
+  minimum_payment: number | null;
+  due_date: string | null;
+  lender: string | null;
+  currency: string;
+  created_at: string;
+}
+
+export interface RecurringTransaction {
+  id: number;
+  category_id: number | null;
+  bucket_id: number | null;
+  account_id: number | null;
+  direction: 'inflow' | 'outflow';
+  amount: number;
+  currency: string;
+  frequency: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  next_due_date: string;
+  active: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface RecurringWithDue extends RecurringTransaction {
+  category_name?: string | null;
+  bucket_name?: string | null;
+  bucket_key?: string | null;
+  account_name?: string | null;
+  days_until_due: number;
+  is_upcoming: boolean;
+}
+
+export interface ReconciliationResult {
+  account_id: number;
+  account_name: string;
+  currency: string;
+  actual_balance: number;
+  computed_balance: number;
+  variance: number;
+  is_reconciled: boolean;
+  reconciled_date: string;
 }
 

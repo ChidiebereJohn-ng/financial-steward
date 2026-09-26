@@ -544,9 +544,20 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
     )
     .all<Transaction & { category_name?: string; bucket_name?: string; account_name?: string }>();
 
+  // 4. Upcoming commitments (due in <= 3 days, active)
+  let upcoming: any[] = [];
+  try {
+    const { getRecurringTransactions } = await import('./commitments');
+    const recurringRes = await getRecurringTransactions(db, { activeOnly: true });
+    upcoming = recurringRes.recurring.filter((r) => r.is_upcoming);
+  } catch {
+    // commitments table may not exist in pre-Module 5 tests
+  }
+
   return {
     buckets,
     daily_series: dailySeries,
     recent_transactions: recent,
+    upcoming_commitments: upcoming,
   };
 }

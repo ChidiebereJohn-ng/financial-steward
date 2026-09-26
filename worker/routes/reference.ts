@@ -227,4 +227,29 @@ app.post('/accounts', async (c) => {
   return c.json({ account: created }, 201);
 });
 
+// POST /api/accounts/:id/reconcile — Reconcile account with statement balance
+app.post('/accounts/:id/reconcile', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (isNaN(id)) {
+    return c.json({ error: 'Invalid account ID' }, 400);
+  }
+
+  const body = await c.req.json<{
+    actual_balance: number;
+    date?: string;
+  }>();
+
+  if (body.actual_balance === undefined || typeof body.actual_balance !== 'number') {
+    return c.json({ error: 'actual_balance number is required' }, 400);
+  }
+
+  try {
+    const { reconcileAccount } = await import('../lib/commitments');
+    const result = await reconcileAccount(c.env.DB, id, body.actual_balance, body.date);
+    return c.json({ data: result });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Reconciliation failed' }, 400);
+  }
+});
+
 export default app;

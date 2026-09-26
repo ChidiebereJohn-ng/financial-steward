@@ -10,7 +10,11 @@ import bucketsRoutes from './routes/buckets';
 import dashboardsRoutes from './routes/dashboards';
 import netWorthRoutes from './routes/networth';
 import budgetsRoutes from './routes/budgets';
+import goalsRoutes from './routes/goals';
+import liabilitiesRoutes from './routes/liabilities';
+import recurringRoutes from './routes/recurring';
 import { refreshMonthlySummaries, computeNetWorth } from './lib/analytics';
+import { getRecurringTransactions } from './lib/commitments';
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -29,7 +33,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'ok',
     app: 'Financial Steward API',
-    module: 'Module 4: Budgets (Adherence %, Category Variance, Charts)',
+    module: 'Module 5: Goals, Liabilities, Recurring Transactions & Reconciliation',
     timestamp: new Date().toISOString()
   });
 });
@@ -45,6 +49,9 @@ app.route('/api/buckets', bucketsRoutes);
 app.route('/api/dashboard', dashboardsRoutes);
 app.route('/api/net-worth', netWorthRoutes);
 app.route('/api/budgets', budgetsRoutes);
+app.route('/api/goals', goalsRoutes);
+app.route('/api/liabilities', liabilitiesRoutes);
+app.route('/api/recurring', recurringRoutes);
 
 // Fallback 404
 app.notFound((c) => {
@@ -66,6 +73,14 @@ export async function handleScheduled(
 
       const snapshotResult = await computeNetWorth(env.DB);
       console.log(`[CRON] Computed net worth snapshot: ₦${snapshotResult.net_worth} (Assets: ₦${snapshotResult.total_assets})`);
+
+      // Section 9 APP_LOGIC.md: Scan recurring commitments due in <= 3 days
+      try {
+        const { recurring, upcoming_count } = await getRecurringTransactions(env.DB, { activeOnly: true });
+        console.log(`[CRON] Recurring commitments scan: ${upcoming_count} upcoming due within 3 days (Total active: ${recurring.length})`);
+      } catch (err: any) {
+        console.log('[CRON] Recurring commitments scan skipped or table not initialized:', err.message);
+      }
     } catch (err) {
       console.error('[CRON] Execution failed:', err);
     }

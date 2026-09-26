@@ -88,7 +88,7 @@ This baseline documents core architectural decisions from the project specificat
 | 2 | **Ledger + Allocation Engine** (Core Math, Bucket Ledger, Transfers) | **Completed** | `0002_ledger_allocation.sql` | 26/26 Passing | Core Ledger Schema, Waterfall Engine, Transfers, Reversal Immutability, Deployed API |
 | 3 | **Two Dashboards** (Financial Health + Money Movement) | **Completed** | `0003_dashboards.sql` | 35/35 Passing | Precomputed Summaries, Net Worth Engine, Health & Ledger APIs, Nightly Cron Handler, React PWA Shell & Dashboards, Deployed API |
 | 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Completed** | `0004_budgets.sql` | 55/55 Passing | Budgets Table, Exact Clamped Adherence Math, Paired Non-Isolation Invariant, Copy Previous Month, Screen 5 Budgets, Deployed API |
-| 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Not Started** | None | Not Started | — |
+| 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Completed** | `0005_commitments.sql` | 75/75 Passing | Goals & Dynamic Live Bucket Progress, Liabilities Engine, Recurring Scanner & Auto-Advance, Account Reconciliation Variance Engine, Screens 6 & 9, Deployed API |
 | 6 | **Investor Module** (Holdings, NGX Manual, Live Crypto, Simulator) | **Not Started** | None | Not Started | — |
 | 7 | **Purchase Calculator, Research Digest, CSV Export** | **Not Started** | None | Not Started | — |
 | 8 | **WealthVault Data Migration** (Ingestion Pipeline, Reconciliation) | **Not Started** | None | Not Started | — |
@@ -149,15 +149,34 @@ This baseline documents core architectural decisions from the project specificat
 - **Screen 5 (Budgets UI):**
   Built `app/src/screens/BudgetsScreen.tsx` featuring month stepper/selector, honest KPI summary row, paired worst offenders callout banner, FinanceAI-style rounded bar comparison chart (Planned vs. Actual spend), smooth adherence trend line chart, and an interactive category variance table with inline editing and one-click budget persistence. Mounted under the "Budgets & Goals" navigation tab.
 
+### 4.5 Goals, Liabilities, Recurring Transactions & Reconciliation (Module 5)
+- **Dynamic Bucket-Linked Goals Progress Invariant:**
+  Goal progress is never stored statically. It is calculated dynamically from the live scalar balance of its linked bucket ($\text{Progress \%} = \min(100, (\text{Bucket Balance} / \text{Target}) \times 100)$). Inflows allocated or transferred to the bucket instantly update the goal's progress bar and remaining amount with zero data denormalization.
+- **Liabilities Engine & Net Worth Integration:**
+  Created `liabilities` table tracking principal, current balance, interest rate, minimum payment, and lender. Connected directly to `computeNetWorth` where outstanding debt balances are aggregated and deducted from total assets.
+- **Recurring Commitments & Auto-Advance Engine:**
+  Commitments track scheduled obligations (`weekly`, `monthly`, `quarterly`, `yearly`). Nightly scheduled worker cron scans for commitments due within $\le 3$ days. Confirmation endpoint (`POST /api/recurring/:id/confirm`) atomically inserts a real ledger transaction, triggers allocation/expense debiting, and rolls `next_due_date` forward by the interval.
+- **Account Reconciliation & Variance Detection:**
+  Implements `reconcileAccount(accountId, actualBalance, date)` from Section 10 of `APP_LOGIC.md`. Calculates computed balance as $\sum(\text{signed transaction amounts})$ for the account, measures variance against the user's actual statement balance, and records `last_reconciled_balance` and `last_reconciled_date`. Any non-zero discrepancy is surfaced with a prominent warning flag rather than silently accepted.
+- **D1 Migration `0005_commitments.sql`:**
+  Created tables `goals`, `liabilities`, and `recurring_transactions` with indexes. Applied locally and remotely to Cloudflare D1 `finance-app-db`.
+- **Frontend Screens (6, 9 & Tools):**
+  - Built `app/src/screens/GoalsScreen.tsx` (Screen 6: Goals) with live bucket-linked progress cards and goal creation/edit modals.
+  - Built `app/src/screens/LiabilitiesScreen.tsx` (Screen 9: Liabilities) with debt overview KPI cards, liability cards, and balance update modals.
+  - Built `app/src/components/ReconcileModal.tsx` for one-click account reconciliation with statement balance comparison and variance detection.
+  - Added upcoming commitments reminder section with one-click confirmation to `LedgerDashboard.tsx`.
+  - Mounted screens cleanly in `app/src/App.tsx`.
+
 ---
 
 ## 5. Resume State & Next Step
-- **Current Position:** Module 4: Budgets (Adherence %, Category Variance, Charts) complete, tested (55/55 passing), applied locally and remotely to `finance-app-db`, and deployed to Cloudflare Edge.
-- **Last Applied Migration:** `0004_budgets.sql` (applied locally and remotely to `finance-app-db`).
-- **Next Step:** Module 5: Goals, Liabilities, Recurring Transactions & Reconciliation
-  - Author migration `worker/migrations/0005_commitments.sql` (`goals`, `liabilities`, `recurring_transactions`).
-  - Implement `reconcileAccount(accountId, actualBalance, date)`.
-  - Implement recurring commitment due-scan logic in scheduled cron handler.
-  - Implement `GET/POST/PATCH /api/goals`, `GET/POST/PATCH /api/liabilities`, `GET/POST/PATCH /api/recurring`, and `POST /api/accounts/:id/reconcile`.
-  - Build Screen 6 (Goals with bucket-linked progress), Screen 9 (Liabilities payment cards), and Account reconciliation UI.
+- **Current Position:** Module 5: Goals, Liabilities, Recurring Transactions & Reconciliation complete, fully tested (75/75 passing), migration `0005_commitments.sql` applied locally and remotely to `finance-app-db`, frontend built and bundled, and worker deployed to Cloudflare Edge.
+- **Last Applied Migration:** `0005_commitments.sql` (applied locally and remotely to `finance-app-db`).
+- **Next Step:** Module 6: Investor Module
+  - Author migration `worker/migrations/0006_investor.sql` (`investments`, `investment_price_updates`, `strategies`, `strategy_stages`).
+  - Implement manual NGX price update journal (`source = 'manual'`).
+  - Implement live crypto/global equities price proxy with KV caching (TTL 15 min).
+  - Implement staged compounding capital curve simulation engine:
+    $$\text{Capital}_k = \text{Capital}_{k-1} \times (1 + \text{Return}_k)$$
+  - Build Screen 7: Investor Module (NGX / Global / Crypto tabs, manual price modals, strategy simulator projection chart).
 

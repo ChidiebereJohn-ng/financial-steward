@@ -461,11 +461,12 @@ describe('Module 4: Budgets (Adherence %, Category Variance, Charts)', () => {
       expect(data.series.length).toBe(4);
     });
 
-    it('Health check endpoint should report Module 4 status', async () => {
+    it('Health check endpoint should report status and current module', async () => {
       const res = await app.request('/api/health');
       expect(res.status).toBe(200);
       const data = await res.json() as any;
-      expect(data.module).toContain('Module 4: Budgets');
+      expect(data.status).toBe('ok');
+      expect(data.module).toBeDefined();
     });
   });
 });

@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { ChartCard } from '../components/ChartCard';
 import { KpiCard } from '../components/KpiCard';
 import { BucketBadge } from '../components/BucketBadge';
+import { ReconcileModal } from '../components/ReconcileModal';
 import type { LedgerDashboardData } from '../../../worker/types';
 
 export const LedgerDashboard: React.FC = () => {
   const [data, setData] = useState<LedgerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showReconcileModal, setShowReconcileModal] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     fetchLedgerData();
@@ -26,6 +30,30 @@ export const LedgerDashboard: React.FC = () => {
       console.error('Failed to load ledger dashboard data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmCommitment = async (id: number) => {
+    try {
+      setConfirmingId(id);
+      const res = await fetch(`/api/recurring/${id}/confirm`, {
+        method: 'POST',
+        headers: { 'x-dev-bypass': 'true' },
+      });
+      if (res.ok) {
+        setFeedback({ type: 'success', text: 'Commitment recorded in ledger and due date rolled forward!' });
+        setTimeout(() => setFeedback(null), 4000);
+        fetchLedgerData();
+      } else {
+        const errJson = await res.json();
+        setFeedback({ type: 'error', text: errJson.error || 'Failed to confirm commitment' });
+        setTimeout(() => setFeedback(null), 4000);
+      }
+    } catch {
+      setFeedback({ type: 'error', text: 'Network error confirming commitment' });
+      setTimeout(() => setFeedback(null), 4000);
+    } finally {
+      setConfirmingId(null);
     }
   };
 
@@ -175,8 +203,31 @@ export const LedgerDashboard: React.FC = () => {
           >
             Transfer
           </button>
+          <button
+            style={{
+              padding: '9px 14px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--color-primary)',
+              color: 'var(--color-primary)',
+              borderRadius: 'var(--radius-sm)',
+              fontWeight: 600,
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            onClick={() => setShowReconcileModal(true)}
+          >
+            <span>⚖️</span> Reconcile
+          </button>
         </div>
       </div>
+
+      {feedback && (
+        <div className={`feedback-toast ${feedback.type}`}>
+          {feedback.text}
+        </div>
+      )}
 
       {/* Top Stat Card Row (Matching Section 12 rule: 3-4 cards across top of both dashboards) */}
       <div className="kpi-grid">
@@ -254,6 +305,74 @@ export const LedgerDashboard: React.FC = () => {
         ))}
       </div>
 
+      {/* Upcoming Commitments (APP_LOGIC.md Section 9) */}
+      {data.upcoming_commitments && data.upcoming_commitments.length > 0 && (
+        <div className="budget-variance-card" style={{ marginBottom: '24px', borderLeft: '4px solid #f59e0b' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⏰</span> Upcoming Commitments
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                Recurring payments due within the next 3 days
+              </p>
+            </div>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#b45309', backgroundColor: 'rgba(245, 158, 11, 0.12)', padding: '3px 8px', borderRadius: '4px' }}>
+              {data.upcoming_commitments.length} Due Soon
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {data.upcoming_commitments.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 14px',
+                  backgroundColor: 'var(--bg-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>
+                    {item.note || item.category_name || 'Commitment'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    {item.frequency} • Due {item.next_due_date} ({item.days_until_due <= 0 ? 'Due today/overdue' : `in ${item.days_until_due} days`})
+                    {item.account_name && ` • ${item.account_name}`}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 700 }} className="tabular-nums">
+                    {formatNgn(item.amount)}
+                  </div>
+                  <button
+                    onClick={() => handleConfirmCommitment(item.id)}
+                    disabled={confirmingId === item.id}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      backgroundColor: 'var(--color-primary)',
+                      color: '#ffffff',
+                      borderRadius: 'var(--radius-sm)',
+                      opacity: confirmingId === item.id ? 0.7 : 1,
+                    }}
+                  >
+                    {confirmingId === item.id ? 'Confirming...' : 'Confirm Payment'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Daily Inflow / Outflow Bar Chart */}
       <div style={{ marginBottom: '24px' }}>
         <ChartCard
@@ -312,6 +431,17 @@ export const LedgerDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Reconcile Modal */}
+      <ReconcileModal
+        isOpen={showReconcileModal}
+        onClose={() => setShowReconcileModal(false)}
+        onReconciled={() => {
+          fetchLedgerData();
+          setFeedback({ type: 'success', text: 'Account reconciliation logged.' });
+          setTimeout(() => setFeedback(null), 4000);
+        }}
+      />
     </div>
   );
 };
