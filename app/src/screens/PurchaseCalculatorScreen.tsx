@@ -40,6 +40,16 @@ export const PurchaseCalculatorScreen: React.FC = () => {
         const snapshots = nwData.snapshots || [];
         if (snapshots.length > 0) {
           setLatestSnapshot(snapshots[0]);
+        } else {
+          // Initialize baseline snapshot if none exists yet
+          const initRes = await fetch('/api/net-worth/snapshot', {
+            method: 'POST',
+            headers: { 'x-dev-bypass': 'true' },
+          });
+          if (initRes.ok) {
+            const initData = await initRes.json();
+            setLatestSnapshot(initData.snapshot || initData);
+          }
         }
       }
 
