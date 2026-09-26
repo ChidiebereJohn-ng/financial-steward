@@ -31,7 +31,7 @@ export const HealthDashboard: React.FC = () => {
 
   if (loading || !data) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: 'var(--text-muted)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: 'var(--color-text-secondary)' }}>
         Loading Financial Health Dashboard...
       </div>
     );
@@ -41,7 +41,7 @@ export const HealthDashboard: React.FC = () => {
     return '₦' + amt.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
-  // 1. Net worth trend chart (Matching Revenue & Expenses smooth curve in Image 1)
+  // 1. Net worth trend chart (Smooth curve, light gradient area fill beneath it, single accent color, no legend clutter)
   const filteredTrend = data.net_worth_trend;
   const netWorthChartConfig = {
     type: 'line' as const,
@@ -49,15 +49,15 @@ export const HealthDashboard: React.FC = () => {
       labels: filteredTrend.map((d) => d.date),
       datasets: [
         {
-          label: 'Net Worth (Assets - Liabilities)',
+          label: 'Net Worth',
           data: filteredTrend.map((d) => d.net_worth),
-          borderColor: '#2563eb',
+          borderColor: '#2563EB',
           backgroundColor: 'rgba(37, 99, 235, 0.06)',
           fill: true,
-          tension: 0.4,
+          tension: 0.35,
           pointRadius: 3,
           pointHoverRadius: 6,
-          pointBackgroundColor: '#2563eb',
+          pointBackgroundColor: '#2563EB',
           borderWidth: 2.5,
         },
       ],
@@ -77,8 +77,10 @@ export const HealthDashboard: React.FC = () => {
           ticks: { color: '#94a3b8', font: { size: 11 } },
         },
         y: {
-          border: { dash: [4, 4] },
-          grid: { color: '#f1f5f9' },
+          border: { display: false },
+          grid: {
+            color: (context: any) => (context.tick.value === 0 ? '#E2E8F0' : 'transparent'),
+          },
           ticks: {
             color: '#94a3b8',
             font: { size: 11 },
@@ -89,7 +91,7 @@ export const HealthDashboard: React.FC = () => {
     },
   };
 
-  // 2. Spending / Allocation Waterfall Chart (Matching chunky rounded blue bars in Image 1 "Spending by Category")
+  // 2. Allocation Waterfall Chart (Rounded top corners, generous gap, no gridlines except faint baseline)
   const splits = data.allocation_waterfall.splits;
   const waterfallChartConfig = {
     type: 'bar' as const,
@@ -106,9 +108,9 @@ export const HealthDashboard: React.FC = () => {
             splits.charity || 0,
             splits.expense || 0,
           ],
-          backgroundColor: '#2563eb',
+          backgroundColor: '#2563EB',
           borderRadius: 8,
-          barPercentage: 0.65,
+          barPercentage: 0.6,
         },
       ],
     },
@@ -124,11 +126,13 @@ export const HealthDashboard: React.FC = () => {
       scales: {
         x: {
           grid: { display: false },
-          ticks: { color: '#64748b', font: { size: 12, weight: 600 } },
+          ticks: { color: '#64748B', font: { size: 12, weight: 600 } },
         },
         y: {
-          border: { dash: [4, 4] },
-          grid: { color: '#f1f5f9' },
+          border: { display: false },
+          grid: {
+            color: (context: any) => (context.tick.value === 0 ? '#E2E8F0' : 'transparent'),
+          },
           ticks: {
             color: '#94a3b8',
             font: { size: 11 },
@@ -143,14 +147,14 @@ export const HealthDashboard: React.FC = () => {
 
   return (
     <div>
-      {/* Top Bar with Search & Date (Matching Image 1) */}
+      {/* Top Bar with Search & Date */}
       <div className="top-bar">
         <div className="search-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input type="text" placeholder="Search transactions, accounts, or stewardship insights..." readOnly />
+          <input type="text" placeholder="Search transactions, accounts, or insights..." readOnly />
         </div>
 
         <div className="date-pill">
@@ -166,32 +170,18 @@ export const HealthDashboard: React.FC = () => {
 
       {/* Screen Title */}
       <div className="screen-header">
-        <h2 className="screen-title">Dashboard Overview</h2>
-        <p className="screen-subtitle">Monitor your stewardship trajectory, allocation discipline, and runway</p>
+        <h2 className="screen-title">Financial Health</h2>
+        <p className="screen-subtitle">Cumulative standing, allocation discipline, and stewardship trajectory</p>
       </div>
 
-      {/* Mobile Vibrant Balance Hero Card (Matching Image 3) */}
-      <div className="mobile-hero-card">
-        <div className="hero-balance-label">Total Net Worth</div>
-        <div className="hero-balance-value">{formatNgn(data.net_worth_current)}</div>
-        <div className="hero-actions">
-          <button className="hero-btn" onClick={() => alert('Add Transaction modal')}>
-            + Inflow
-          </button>
-          <button className="hero-btn-outline" onClick={() => alert('Transfer modal')}>
-            Transfer
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards Row (Matching Image 1 cards) */}
+      {/* Stat Card Row (Matching Section 12) */}
       <div className="kpi-grid">
         <KpiCard
           label="Total Net Worth"
           value={formatNgn(data.net_worth_current)}
           icon="$"
           iconBg="rgba(37, 99, 235, 0.08)"
-          iconColor="#2563eb"
+          iconColor="var(--color-primary)"
           trend={{
             value: '+12.5% vs last month',
             direction: 'up',
@@ -199,11 +189,11 @@ export const HealthDashboard: React.FC = () => {
         />
 
         <KpiCard
-          label="Savings & Invest Rate"
+          label="Savings & Investment Rate"
           value={`${data.savings_invest_rate.this_month_pct}%`}
           icon="↗"
-          iconBg="rgba(16, 185, 129, 0.08)"
-          iconColor="#10b981"
+          iconBg="rgba(22, 163, 74, 0.08)"
+          iconColor="var(--color-positive)"
           trend={{
             value: `${Math.abs(data.savings_invest_rate.change_pct)}% vs last month`,
             direction: data.savings_invest_rate.change_pct >= 0 ? 'up' : 'down',
@@ -216,7 +206,7 @@ export const HealthDashboard: React.FC = () => {
           value={`${data.budget_adherence_summary.overall_adherence_pct}%`}
           icon="◈"
           iconBg="rgba(139, 92, 246, 0.08)"
-          iconColor="#8b5cf6"
+          iconColor="var(--bucket-tithe)"
           trend={{
             value: `${data.budget_adherence_summary.worst_offenders.length} overages`,
             direction: data.budget_adherence_summary.worst_offenders.length === 0 ? 'up' : 'down',
@@ -228,16 +218,16 @@ export const HealthDashboard: React.FC = () => {
           value={`≈ ${data.runway.runway_days} Days`}
           icon="⚡"
           iconBg="rgba(245, 158, 11, 0.08)"
-          iconColor="#f59e0b"
+          iconColor="var(--bucket-charity)"
           subtext={`${formatNgn(data.runway.expenses_balance)} available`}
         />
       </div>
 
-      {/* Two Side-by-Side Charts (Matching Image 1) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      {/* Two-Column Chart Row (Matching Section 12 layout) */}
+      <div className="chart-row">
         <ChartCard
-          title="Net Worth & Trajectory"
-          subtitle="Monthly cumulative asset performance overview"
+          title="Net Worth Trend"
+          subtitle="Cumulative asset trajectory over time"
           actions={
             <div className="chart-actions">
               {(['3M', '6M', '1Y', 'ALL'] as const).map((r) => (
@@ -261,78 +251,65 @@ export const HealthDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Bottom Row (Matching Image 1: Insights on left, Breakdown/Overages on right) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
-        {/* Left: AI & Stewardship Insights Card */}
+      {/* Bottom Row: Insights on Left, Paired Budget Breakdown on Right */}
+      <div className="chart-row">
+        {/* Left: Grounded Stewardship Insights (No AI-hype framing, matching Section 12) */}
         <div className="chart-card">
           <div className="chart-header">
             <div className="chart-title-group">
-              <h3>AI-Powered Insights</h3>
-              <p>Generated from your stewardship data</p>
+              <h3>Stewardship Insights</h3>
+              <p>Actionable observations from current allocations</p>
             </div>
-            <span style={{ fontSize: '13px', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer' }}>
-              View All →
-            </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ padding: '14px 16px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h5 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Savings & Invest discipline on track
-                </h5>
-                <span className="trend-pill trend-up">High</span>
-              </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Your current monthly savings and investment rate of {data.savings_invest_rate.this_month_pct}% satisfies the biblical remainder ratio.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="insight-card success">
+              <h5 className="insight-title">Savings & Investment Discipline Active</h5>
+              <p className="insight-body">
+                Current month rate of {data.savings_invest_rate.this_month_pct}% fulfills the remainder base allocation ratio.
               </p>
             </div>
 
-            <div style={{ padding: '14px 16px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h5 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Expenses runway healthy
-                </h5>
-                <span className="trend-pill" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#2563eb' }}>Safe</span>
-              </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                At an average burn of {formatNgn(data.runway.avg_daily_burn)}/day, your available expense funds provide {data.runway.runway_days} days of runway.
+            <div className="insight-card">
+              <h5 className="insight-title">Expenses Runway Projection</h5>
+              <p className="insight-body">
+                At an average burn rate of {formatNgn(data.runway.avg_daily_burn)}/day, your available expense funds provide {data.runway.runway_days} days of operational coverage.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Right: Paired Budget Adherence Breakdown Card */}
+        {/* Right: Paired Budget Adherence Summary */}
         <div className="chart-card">
           <div className="chart-header">
             <div className="chart-title-group">
               <h3>Budget Adherence & Variances</h3>
               <p>Paired planned vs. actual category breakdown</p>
             </div>
-            <span style={{ fontSize: '14px', color: 'var(--accent-primary)', fontWeight: 700 }}>
+            <span style={{ fontSize: '14px', color: 'var(--color-primary)', fontWeight: 700 }}>
               {data.budget_adherence_summary.overall_adherence_pct}%
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {data.budget_adherence_summary.worst_offenders.length > 0 && (
-              <div style={{ padding: '12px 14px', backgroundColor: 'rgba(239, 68, 68, 0.06)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#ef4444', fontWeight: 700 }}>Top Overages</span>
+              <div className="insight-card warning">
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--color-negative)', fontWeight: 700 }}>Top Category Overages</span>
                 {data.budget_adherence_summary.worst_offenders.map((o) => (
                   <div key={o.category_id} style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '13px' }}>
                     <span style={{ fontWeight: 500 }}>{o.category_name}</span>
-                    <span style={{ color: '#ef4444', fontWeight: 700 }}>+{formatNgn(o.overage_amount)}</span>
+                    <span style={{ color: 'var(--color-negative)', fontWeight: 700 }}>+{formatNgn(o.overage_amount)}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '220px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
               {data.budget_adherence_summary.categories.map((cat) => (
                 <div key={cat.category_id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{cat.category_name}</span>
-                    <span style={{ color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{cat.category_name}</span>
+                    <span style={{ color: 'var(--color-text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                       {formatNgn(cat.actual)} {cat.planned > 0 && `/ ${formatNgn(cat.planned)}`}
                     </span>
                   </div>
@@ -343,8 +320,8 @@ export const HealthDashboard: React.FC = () => {
                         width: cat.planned > 0 ? `${Math.min((cat.actual / cat.planned) * 100, 100)}%` : '100%',
                         backgroundColor:
                           cat.planned > 0 && cat.actual > cat.planned
-                            ? '#ef4444'
-                            : '#2563eb',
+                            ? 'var(--color-negative)'
+                            : 'var(--color-primary)',
                       }}
                     />
                   </div>

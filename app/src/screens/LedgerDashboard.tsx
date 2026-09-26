@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ChartCard } from '../components/ChartCard';
+import { KpiCard } from '../components/KpiCard';
 import { BucketBadge } from '../components/BucketBadge';
 import type { LedgerDashboardData } from '../../../worker/types';
 
@@ -30,7 +31,7 @@ export const LedgerDashboard: React.FC = () => {
 
   if (loading || !data) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: 'var(--text-muted)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: 'var(--color-text-secondary)' }}>
         Loading Money Movement Dashboard...
       </div>
     );
@@ -40,7 +41,13 @@ export const LedgerDashboard: React.FC = () => {
     return '₦' + amt.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
-  // 30-Day Inflow / Outflow daily bar chart (Matching OFX Image 2 style)
+  // Compute stat card summaries from daily series and buckets
+  const totalInflows30 = data.daily_series.reduce((sum, d) => sum + d.inflow, 0);
+  const totalOutflows30 = data.daily_series.reduce((sum, d) => sum + d.outflow, 0);
+  const netDelta30 = totalInflows30 - totalOutflows30;
+  const totalBucketFunds = data.buckets.reduce((sum, b) => sum + b.balance, 0);
+
+  // 30-Day Inflow / Outflow daily bar chart (rounded top corners, generous gap, faint baseline)
   const dailySeries = data.daily_series;
   const inflowOutflowChartConfig = {
     type: 'bar' as const,
@@ -50,14 +57,14 @@ export const LedgerDashboard: React.FC = () => {
         {
           label: 'Inflows',
           data: dailySeries.map((d) => d.inflow),
-          backgroundColor: '#10b981',
+          backgroundColor: '#16A34A',
           borderRadius: 6,
           barPercentage: 0.6,
         },
         {
           label: 'Outflows',
           data: dailySeries.map((d) => d.outflow),
-          backgroundColor: '#ef4444',
+          backgroundColor: '#DC2626',
           borderRadius: 6,
           barPercentage: 0.6,
         },
@@ -66,6 +73,7 @@ export const LedgerDashboard: React.FC = () => {
     options: {
       plugins: {
         legend: {
+          display: true,
           position: 'top' as const,
           labels: { boxWidth: 10, usePointStyle: true, font: { size: 12 } },
         },
@@ -78,13 +86,15 @@ export const LedgerDashboard: React.FC = () => {
       scales: {
         x: {
           grid: { display: false },
-          ticks: { maxTicksLimit: 12, color: '#94a3b8', font: { size: 11 } },
+          ticks: { maxTicksLimit: 12, color: '#94A3B8', font: { size: 11 } },
         },
         y: {
-          border: { dash: [4, 4] },
-          grid: { color: '#f1f5f9' },
+          border: { display: false },
+          grid: {
+            color: (context: any) => (context.tick.value === 0 ? '#E2E8F0' : 'transparent'),
+          },
           ticks: {
-            color: '#94a3b8',
+            color: '#94A3B8',
             font: { size: 11 },
             callback: (v: any) => `₦${(Number(v) / 1000).toFixed(0)}k`,
           },
@@ -94,12 +104,12 @@ export const LedgerDashboard: React.FC = () => {
   };
 
   const bucketBorderColors: Record<string, string> = {
-    tithe: '#8b5cf6',
-    kingdom: '#6366f1',
-    savings: '#10b981',
-    invest: '#2563eb',
-    charity: '#f59e0b',
-    expense: '#ef4444',
+    tithe: 'var(--bucket-tithe)',
+    kingdom: 'var(--bucket-kingdom)',
+    savings: 'var(--bucket-savings)',
+    invest: 'var(--bucket-invest)',
+    charity: 'var(--bucket-charity)',
+    expense: 'var(--bucket-expense)',
   };
 
   const currentDateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -127,26 +137,25 @@ export const LedgerDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
         <div>
           <h2 className="screen-title">Money Movement</h2>
           <p className="screen-subtitle">Real-time bucket allocations, daily cash flow, and recent activity</p>
         </div>
 
-        {/* Quick Actions (Matching OFX / FinanceAI styling) */}
-        <div style={{ display: 'flex', gap: '10px' }}>
+        {/* Quick Actions (Matching UI_SYSTEM_DESIGN.md) */}
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             style={{
-              padding: '10px 18px',
-              backgroundColor: 'var(--accent-primary)',
+              padding: '9px 16px',
+              backgroundColor: 'var(--color-primary)',
               color: '#ffffff',
-              borderRadius: 'var(--radius-md)',
+              borderRadius: 'var(--radius-sm)',
               fontWeight: 600,
               fontSize: '13px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
             }}
             onClick={() => alert('Add Transaction modal')}
           >
@@ -154,14 +163,13 @@ export const LedgerDashboard: React.FC = () => {
           </button>
           <button
             style={{
-              padding: '10px 16px',
-              backgroundColor: '#ffffff',
+              padding: '9px 14px',
+              backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
-              color: 'var(--text-secondary)',
-              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-text-secondary)',
+              borderRadius: 'var(--radius-sm)',
               fontWeight: 600,
               fontSize: '13px',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             }}
             onClick={() => alert('Transfer modal')}
           >
@@ -170,13 +178,61 @@ export const LedgerDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Top Stat Card Row (Matching Section 12 rule: 3-4 cards across top of both dashboards) */}
+      <div className="kpi-grid">
+        <KpiCard
+          label="Total Allocated Funds"
+          value={formatNgn(totalBucketFunds)}
+          icon="₦"
+          iconBg="rgba(37, 99, 235, 0.08)"
+          iconColor="var(--color-primary)"
+          subtext="Sum across all 6 buckets"
+        />
+
+        <KpiCard
+          label="30-Day Total Inflow"
+          value={formatNgn(totalInflows30)}
+          icon="↓"
+          iconBg="rgba(22, 163, 74, 0.08)"
+          iconColor="var(--color-positive)"
+          trend={{
+            value: 'Inflows',
+            direction: 'up',
+          }}
+        />
+
+        <KpiCard
+          label="30-Day Total Outflow"
+          value={formatNgn(totalOutflows30)}
+          icon="↑"
+          iconBg="rgba(220, 38, 38, 0.08)"
+          iconColor="var(--color-negative)"
+          trend={{
+            value: 'Outflows',
+            direction: 'down',
+          }}
+        />
+
+        <KpiCard
+          label="30-Day Net Delta"
+          value={`${netDelta30 >= 0 ? '+' : ''}${formatNgn(netDelta30)}`}
+          icon="Δ"
+          iconBg={netDelta30 >= 0 ? 'rgba(22, 163, 74, 0.08)' : 'rgba(220, 38, 38, 0.08)'}
+          iconColor={netDelta30 >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'}
+          trend={{
+            value: netDelta30 >= 0 ? 'Surplus' : 'Deficit',
+            direction: netDelta30 >= 0 ? 'up' : 'down',
+          }}
+        />
+      </div>
+
       {/* Six Bucket Balance Cards */}
       <div className="bucket-grid">
         {data.buckets.map((b) => (
           <div
             key={b.id}
             className="bucket-card"
-            style={{ borderTopColor: bucketBorderColors[b.key] || '#94a3b8' }}
+            style={{ borderTopColor: bucketBorderColors[b.key] || 'var(--border-color)' }}
           >
             <div className="bucket-card-header">
               <span className="bucket-name">{b.name}</span>
@@ -184,12 +240,12 @@ export const LedgerDashboard: React.FC = () => {
                 <span className="pass-through-tag">Pass-through</span>
               )}
             </div>
-            <div className="bucket-balance">{formatNgn(b.balance)}</div>
-            <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+            <div className="bucket-balance tabular-nums">{formatNgn(b.balance)}</div>
+            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
               {b.is_pass_through === 1 && b.balance > 0 ? (
-                <span style={{ color: '#d97706', fontWeight: 600 }}>● Pending release</span>
+                <span style={{ color: '#D97706', fontWeight: 600 }}>● Pending release</span>
               ) : b.is_pass_through === 1 ? (
-                <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Released</span>
+                <span style={{ color: 'var(--color-positive)', fontWeight: 600 }}>✓ Released</span>
               ) : (
                 <span>Available funds</span>
               )}
@@ -199,74 +255,60 @@ export const LedgerDashboard: React.FC = () => {
       </div>
 
       {/* Daily Inflow / Outflow Bar Chart */}
-      <ChartCard
-        title="Daily Inflow & Outflow Activity"
-        subtitle="Last 30 days cash movement series"
-        config={inflowOutflowChartConfig}
-      />
+      <div style={{ marginBottom: '24px' }}>
+        <ChartCard
+          title="Daily Inflow & Outflow Activity"
+          subtitle="Cash movements over the past 30 days"
+          config={inflowOutflowChartConfig}
+        />
+      </div>
 
-      {/* Recent Transactions Table (Matching Image 1 table layout) */}
+      {/* Recent Transactions Feed (Matching Section 12 exact transaction row pattern) */}
       <div className="transaction-card">
         <div className="transaction-card-header">
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
               Recent Transactions
             </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
               Latest activity across all accounts
             </p>
           </div>
-          <span style={{ fontSize: '13px', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer' }}>
-            View All →
+          <span style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}>
+            View Full History →
           </span>
         </div>
 
         {data.recent_transactions.length === 0 ? (
-          <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-            No transactions logged yet. Click "+ Add Transaction" to record your first inflow or expense.
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+            No recent transactions recorded. Click "+ Add Transaction" to record your first transaction.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="transaction-table">
-              <thead>
-                <tr>
-                  <th>Transaction</th>
-                  <th>Category</th>
-                  <th>Date</th>
-                  <th>Status / Bucket</th>
-                  <th style={{ textAlign: 'right' }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.recent_transactions.map((tx) => (
-                  <tr key={tx.id}>
-                    <td>
-                      <div className="tx-main">
-                        <div className={`tx-icon-box ${tx.direction}`}>
-                          {tx.direction === 'inflow' ? '↗' : '↘'}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{tx.note || tx.purpose_label || tx.category_name || 'Transaction'}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>TXN-{tx.id.toString().padStart(4, '0')}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{tx.category_name || 'Inflow'}</td>
-                    <td style={{ color: 'var(--text-muted)' }}>{tx.date}</td>
-                    <td>
-                      {tx.bucket_name ? (
-                        <BucketBadge bucketKey={tx.bucket_name.toLowerCase()} name={tx.bucket_name} />
-                      ) : (
-                        <span className="status-pill">Completed</span>
-                      )}
-                    </td>
-                    <td className={`amount-col ${tx.direction}`}>
-                      {tx.direction === 'inflow' ? '+' : '-'}{formatNgn(tx.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="transaction-list">
+            {data.recent_transactions.map((tx) => (
+              <div key={tx.id} className="tx-row">
+                <div className="tx-left">
+                  <div className={`tx-circle ${tx.direction}`}>
+                    {tx.direction === 'inflow' ? '↓' : '↑'}
+                  </div>
+                  <div className="tx-details">
+                    <h4>{tx.note || tx.purpose_label || tx.category_name || 'Transaction'}</h4>
+                    <p>
+                      {tx.category_name || 'Inflow'} • {tx.date}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  {tx.bucket_name && (
+                    <BucketBadge bucketKey={tx.bucket_name.toLowerCase()} name={tx.bucket_name} />
+                  )}
+                  <div className={`tx-amount ${tx.direction}`}>
+                    {tx.direction === 'inflow' ? '+' : '-'}{formatNgn(tx.amount)}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -10,7 +10,6 @@ interface KpiCardProps {
   trend?: {
     value: string | number;
     direction: 'up' | 'down' | 'neutral';
-    label?: string;
   };
 }
 
@@ -20,7 +19,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   subtext,
   icon,
   iconBg = 'rgba(37, 99, 235, 0.08)',
-  iconColor = '#2563eb',
+  iconColor = 'var(--color-primary)',
   trend,
 }) => {
   return (
@@ -37,21 +36,17 @@ export const KpiCard: React.FC<KpiCardProps> = ({
         )}
       </div>
 
-      <div className="kpi-value">{value}</div>
+      <div className="kpi-value tabular-nums">{value}</div>
 
       {(subtext || trend) && (
         <div className="kpi-footer">
           {trend && (
             <span
-              className={`trend-pill ${
-                trend.direction === 'up'
-                  ? 'trend-up'
-                  : trend.direction === 'down'
-                  ? 'trend-down'
-                  : ''
+              className={`trend-indicator ${
+                trend.direction === 'up' ? 'up' : trend.direction === 'down' ? 'down' : ''
               }`}
             >
-              {trend.direction === 'up' ? '↗' : trend.direction === 'down' ? '↘' : '•'}{' '}
+              {trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '•'}{' '}
               {trend.value}
             </span>
           )}

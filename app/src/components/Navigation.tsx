@@ -70,18 +70,17 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <>
-      {/* Desktop Side Navigation (Matching FinanceAI layout) */}
+      {/* Desktop Side Navigation */}
       <aside className="desktop-nav">
         <div className="nav-brand">
           <div className="brand-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 3v18h18" />
-              <path d="m19 9-5 5-4-4-3 3" />
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
           </div>
           <div className="brand-text">
-            <h1>FinanceAI</h1>
-            <span>Stewardship</span>
+            <h1>Steward</h1>
+            <span>Personal Finance PWA</span>
           </div>
         </div>
 
@@ -102,15 +101,15 @@ export const Navigation: React.FC<NavigationProps> = ({
 
         {/* User profile at bottom */}
         <div className="nav-user">
-          <div className="user-avatar">JD</div>
+          <div className="user-avatar">CJ</div>
           <div className="user-info">
-            <h5>John Davis</h5>
-            <p>john@example.com</p>
+            <h5>Chidiebere John</h5>
+            <p>Steward Account</p>
           </div>
         </div>
       </aside>
 
-      {/* Mobile Bottom Navigation (Matching Image 3) */}
+      {/* Mobile Bottom Navigation */}
       <nav className="mobile-nav">
         {navItems.map((item) => (
           <button
