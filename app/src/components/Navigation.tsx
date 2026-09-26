@@ -14,16 +14,19 @@ export const Navigation: React.FC<NavigationProps> = ({
   const navItems = [
     {
       id: 'health' as NavTab,
-      label: 'Health',
+      label: 'Financial Health',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
         </svg>
       ),
     },
     {
       id: 'ledger' as NavTab,
-      label: 'Ledger',
+      label: 'Money Movement',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -55,12 +58,11 @@ export const Navigation: React.FC<NavigationProps> = ({
     },
     {
       id: 'more' as NavTab,
-      label: 'More',
+      label: 'Tools & Settings',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="1" />
-          <circle cx="19" cy="12" r="1" />
-          <circle cx="5" cy="12" r="1" />
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg>
       ),
     },
@@ -68,13 +70,18 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <>
-      {/* Desktop Side Navigation */}
+      {/* Desktop Side Navigation (Matching FinanceAI layout) */}
       <aside className="desktop-nav">
         <div className="nav-brand">
-          <div className="brand-icon">S</div>
+          <div className="brand-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v18h18" />
+              <path d="m19 9-5 5-4-4-3 3" />
+            </svg>
+          </div>
           <div className="brand-text">
-            <h1>Steward</h1>
-            <span>Biblical Wealth</span>
+            <h1>FinanceAI</h1>
+            <span>Stewardship</span>
           </div>
         </div>
 
@@ -85,16 +92,25 @@ export const Navigation: React.FC<NavigationProps> = ({
               onClick={() => onTabChange(item.id)}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
             >
-              <div style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ width: '18px', height: '18px', display: 'flex', alignItems: 'center' }}>
                 {item.icon}
               </div>
               {item.label}
             </button>
           ))}
         </nav>
+
+        {/* User profile at bottom */}
+        <div className="nav-user">
+          <div className="user-avatar">JD</div>
+          <div className="user-info">
+            <h5>John Davis</h5>
+            <p>john@example.com</p>
+          </div>
+        </div>
       </aside>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation (Matching Image 3) */}
       <nav className="mobile-nav">
         {navItems.map((item) => (
           <button
@@ -103,7 +119,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             className={`mobile-nav-item ${activeTab === item.id ? 'active' : ''}`}
           >
             {item.icon}
-            <span>{item.label}</span>
+            <span>{item.id === 'health' ? 'Health' : item.id === 'ledger' ? 'Ledger' : item.id === 'investor' ? 'Investor' : item.id === 'budgets' ? 'Budgets' : 'More'}</span>
           </button>
         ))}
       </nav>

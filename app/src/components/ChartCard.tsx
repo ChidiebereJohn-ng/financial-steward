@@ -3,6 +3,7 @@ import Chart, { ChartConfiguration } from 'chart.js/auto';
 
 interface ChartCardProps {
   title: string;
+  subtitle?: string;
   actions?: React.ReactNode;
   config: ChartConfiguration;
   height?: number;
@@ -10,6 +11,7 @@ interface ChartCardProps {
 
 export const ChartCard: React.FC<ChartCardProps> = ({
   title,
+  subtitle,
   actions,
   config,
   height = 280,
@@ -20,22 +22,33 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Destroy prior instance if existing
     if (chartInstanceRef.current) {
       chartInstanceRef.current.destroy();
     }
 
-    // Apply dark mode theme defaults to Chart.js
-    Chart.defaults.color = '#94a3b8';
-    Chart.defaults.borderColor = '#24324f';
+    // Modern light theme defaults for Chart.js
+    Chart.defaults.color = '#64748b';
+    Chart.defaults.borderColor = '#f1f5f9';
     Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
 
-    // Create chart
     chartInstanceRef.current = new Chart(canvasRef.current, {
       ...config,
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          ...config.options?.plugins,
+          tooltip: {
+            backgroundColor: '#0f172a',
+            titleColor: '#ffffff',
+            bodyColor: '#ffffff',
+            padding: 10,
+            cornerRadius: 8,
+            boxPadding: 4,
+            usePointStyle: true,
+            ...config.options?.plugins?.tooltip,
+          },
+        },
         ...config.options,
       },
     });
@@ -51,7 +64,10 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   return (
     <div className="chart-card">
       <div className="chart-header">
-        <h3 className="chart-title">{title}</h3>
+        <div className="chart-title-group">
+          <h3>{title}</h3>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
         {actions && <div className="chart-actions">{actions}</div>}
       </div>
       <div className="chart-container" style={{ height: `${height}px` }}>
