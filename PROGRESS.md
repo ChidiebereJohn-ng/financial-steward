@@ -90,7 +90,7 @@ This baseline documents core architectural decisions from the project specificat
 | 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Completed** | `0004_budgets.sql` | 55/55 Passing | Budgets Table, Exact Clamped Adherence Math, Paired Non-Isolation Invariant, Copy Previous Month, Screen 5 Budgets, Deployed API |
 | 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Completed** | `0005_commitments.sql` | 75/75 Passing | Goals & Dynamic Live Bucket Progress, Liabilities Engine, Recurring Scanner & Auto-Advance, Account Reconciliation Variance Engine, Screens 6 & 9, Deployed API |
 | 6 | **Investor Module** (Holdings, NGX Manual, Live Crypto, Simulator) | **Completed** | `0006_investor.sql` | 97/97 Passing | Investments Schema, Manual NGX Price Journal, KV-Cached Live Price Proxy (15m TTL), Staged Compounding Simulator & Chart, Screen 7 Investor UI, Deployed API |
-| 7 | **Purchase Calculator, Research Digest, CSV Export** | **Not Started** | None | Not Started | — |
+| 7 | **Purchase Calculator, Research Digest, CSV Export** | **Completed** | `0007_tools.sql` | 122/122 Passing | Purchase Calculations Schema, 7-Tier Risk Ratio Evaluator, Net Worth Snapshot Grounding Invariant, Curated Research Digest, RFC 4180 Full CSV Exporter, Screen 8 & Screen 11 UI, Deployed API |
 | 8 | **WealthVault Data Migration** (Ingestion Pipeline, Reconciliation) | **Not Started** | None | Not Started | — |
 
 ---
@@ -190,15 +190,39 @@ This baseline documents core architectural decisions from the project specificat
   - Holdings table with dynamic gain/loss indicator badges, price source indicators (`manual` vs `live-price`), "+ Add Holding" modal, and holding-specific "Update Price" modal.
   - Strategy Simulator tab with strategy selector, starting capital input, custom stage builder, smooth Chart.js capital progression curve, and disclaimer banner. Mounted under active `Investor` navigation tab.
 
+### 4.7 Purchase Calculator, Research Digest & Full CSV Export (Module 7)
+- **D1 Migration `0007_tools.sql`:**
+  - Created tables `purchase_calculations` (`item`, `cost`, `net_worth_at_time`, `ratio_pct`, `tier_result`, `date`), `digest_items` (`topic`, `summary`, `source_url`, `read_status`), and `import_batches` (`file_name`, `row_count`, `status`, `error_log`). Pre-seeded curated macro/fixed-income intelligence items. Applied locally and remotely to Cloudflare D1 `finance-app-db`.
+- **7-Tier Purchase Risk Scale (`evaluatePurchaseRiskTier`):**
+  - Evaluates ratio against the exact scale defined in Section 5 of `APP_LOGIC.md`:
+    - $\text{Ratio} < 1\%$ $\rightarrow$ `"Safe"`
+    - $\text{Ratio} < 5\%$ $\rightarrow$ `"Comfortable"`
+    - $\text{Ratio} < 10\%$ $\rightarrow$ `"Major Purchase"`
+    - $\text{Ratio} < 20\%$ $\rightarrow$ `"Good Reason to Purchase"`
+    - $\text{Ratio} < 30\%$ $\rightarrow$ `"Call a Family Member"`
+    - $\text{Ratio} \le 50\%$ $\rightarrow$ `"Whatever You Bought Owns You"`
+    - $\text{Ratio} > 50\%$ $\rightarrow$ `"Call Your Ancestors"`
+- **Net Worth Snapshot Grounding Invariant:**
+  - The ratio $\text{Cost} / \text{NetWorth}_{\text{snapshot}} \times 100$ is strictly evaluated and persisted against the latest row in `net_worth_snapshots`. It is never recomputed mid-calculation against live volatile balances, ensuring historical auditability and reproducible advice.
+- **Curated Financial Research Digest Engine:**
+  - Provides `GET /api/digest`, `PATCH /api/digest/:id/read`, and `POST /api/digest` for listing, creating, and marking intelligence briefs as read/unread.
+- **RFC 4180 Multi-Entity CSV Exporter (`worker/lib/export.ts`):**
+  - Exports a consolidated, fully-escaped CSV archive (`GET /api/export?format=csv`) containing distinct sections for Transactions, Bucket Ledgers, Investments, Budgets, Goals, Liabilities, and Net Worth Snapshots with compliant CRLF record terminators and double-quote escaping.
+- **Frontend Screens (8, 11 & Settings):**
+  - Built `app/src/screens/PurchaseCalculatorScreen.tsx` (Screen 8) with benchmark net worth card, calculation form with presets, visual risk evaluation banner with contextual stewardship advice, and historical calculation log.
+  - Built `app/src/screens/DigestScreen.tsx` (Screen 11) with unread pill indicators, briefing expansion, external source links, and "+ Add Intel Note" modal.
+  - Built `app/src/components/CsvExportCard.tsx` providing a one-click CSV download experience.
+  - Mounted cleanly inside the "Tools & Settings" (`more`) sub-navigation in `app/src/App.tsx`.
+
 ---
 
 ## 5. Resume State & Next Step
-- **Current Position:** Module 6: Investor Module complete, fully tested (97/97 passing), migration `0006_investor.sql` applied locally and remotely to `finance-app-db`, frontend built and bundled, and Screen 7 live.
-- **Last Applied Migration:** `0006_investor.sql` (applied locally and remotely to `finance-app-db`).
-- **Next Step:** Module 7: Purchase Calculator, Research Digest & CSV Export
-  - Author migration `worker/migrations/0007_tools.sql` (`purchase_calculations`, `digest_items`, `import_batches`).
-  - Implement 7-tier purchase risk ratio evaluator: $\text{Ratio} = (\text{Cost} / \text{NetWorth}_{\text{snapshot}}) \times 100$.
-  - Implement scheduled research digest worker cron trigger (weekly Monday).
-  - Implement full CSV data exporter (`GET /api/export?format=csv`).
-  - Build Screen 8 (Purchase Calculator), Screen 11 (Research Digest), and CSV Export settings UI.
+- **Current Position:** Module 7: Purchase Calculator, Research Digest & CSV Export complete, fully tested (122/122 passing), migration `0007_tools.sql` applied locally and remotely to `finance-app-db`, frontend built and bundled, Screens 8 & 11 live, and Worker deployed.
+- **Last Applied Migration:** `0007_tools.sql` (applied locally and remotely to `finance-app-db`).
+- **Next Step:** Module 8: WealthVault Data Migration
+  - Implement 19-column RFC 4180 CSV parser for historical transactions.
+  - Deduplicate on `transactions.external_id`.
+  - Reconstruct `allocation_runs` from historical snapshot columns (`split_tithe` ... `split_expense`).
+  - Generate historical `bucket_ledger_entries` for inflows and subtype migrations (`bucket_deploy` / `bucket_transfer`).
+  - Implement post-import ledger reconciliation to verify zero balance variance against WealthVault bucket totals.
 

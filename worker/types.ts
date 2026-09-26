@@ -419,3 +419,51 @@ export interface PortfolioSummary {
   };
 }
 
+export type PurchaseTier =
+  | 'Safe'
+  | 'Comfortable'
+  | 'Major Purchase'
+  | 'Good Reason to Purchase'
+  | 'Call a Family Member'
+  | 'Whatever You Bought Owns You'
+  | 'Call Your Ancestors';
+
+export interface PurchaseCalculation {
+  id: number;
+  item: string;
+  cost: number;
+  net_worth_at_time: number;
+  ratio_pct: number;
+  tier_result: PurchaseTier;
+  date: string;
+  created_at: string;
+}
+
+export interface PurchaseRiskResult {
+  item: string;
+  cost: number;
+  net_worth_at_time: number;
+  ratio_pct: number;
+  tier_result: PurchaseTier;
+  date: string;
+  calculation_id?: number;
+}
+
+export interface DigestItem {
+  id: number;
+  topic: string;
+  summary: string;
+  source_url: string | null;
+  read_status: number; // 0 = unread, 1 = read
+  created_at: string;
+}
+
+export interface ImportBatch {
+  id: number;
+  file_name: string;
+  row_count: number;
+  status: 'pending' | 'completed' | 'failed';
+  error_log: string | null;
+  imported_at: string;
+}
+

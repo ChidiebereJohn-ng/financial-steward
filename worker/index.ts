@@ -15,6 +15,7 @@ import liabilitiesRoutes from './routes/liabilities';
 import recurringRoutes from './routes/recurring';
 import investorRoutes from './routes/investor';
 import strategiesRoutes from './routes/strategies';
+import toolsRoutes from './routes/tools';
 import { refreshMonthlySummaries, computeNetWorth } from './lib/analytics';
 import { getRecurringTransactions } from './lib/commitments';
 
@@ -35,7 +36,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'ok',
     app: 'Financial Steward API',
-    module: 'Module 6: Investor Module (Holdings, NGX Manual Journal, Live Crypto Proxy, & Staged Compounding Simulator)',
+    module: 'Module 7: Purchase Calculator, Research Digest & CSV Export',
     timestamp: new Date().toISOString()
   });
 });
@@ -56,6 +57,7 @@ app.route('/api/liabilities', liabilitiesRoutes);
 app.route('/api/recurring', recurringRoutes);
 app.route('/api/investments', investorRoutes);
 app.route('/api/strategies', strategiesRoutes);
+app.route('/api', toolsRoutes);
 
 // Fallback 404
 app.notFound((c) => {
