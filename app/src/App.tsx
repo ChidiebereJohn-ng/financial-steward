@@ -5,6 +5,7 @@ import { LedgerDashboard } from './screens/LedgerDashboard';
 import { BudgetsScreen } from './screens/BudgetsScreen';
 import { GoalsScreen } from './screens/GoalsScreen';
 import { LiabilitiesScreen } from './screens/LiabilitiesScreen';
+import { InvestorScreen } from './screens/InvestorScreen';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('health');
@@ -17,12 +18,7 @@ export const App: React.FC = () => {
       <main className="main-content">
         {activeTab === 'health' && <HealthDashboard />}
         {activeTab === 'ledger' && <LedgerDashboard />}
-        {activeTab === 'investor' && (
-          <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Investor Module</h2>
-            <p>Scheduled for Module 6: NGX manual prices, live crypto, and staged compounding simulator.</p>
-          </div>
-        )}
+        {activeTab === 'investor' && <InvestorScreen />}
         {activeTab === 'budgets' && (
           <div>
             {/* Sub-tab switcher between Budgets and Goals */}

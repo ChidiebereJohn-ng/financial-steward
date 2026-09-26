@@ -329,3 +329,93 @@ export interface ReconciliationResult {
   reconciled_date: string;
 }
 
+// Module 6: Investor Module
+export interface Investment {
+  id: number;
+  type: 'equity' | 'mutual_fund' | 'treasury_bill' | 'crypto' | string;
+  symbol_or_name: string;
+  market: 'NGX' | 'global' | 'crypto' | string;
+  quantity: number | null;
+  cost_basis: number;
+  currency: string;
+  current_value: number | null;
+  strategy_id: number | null;
+  account_id: number | null;
+  created_at: string;
+}
+
+export interface InvestmentWithGainLoss extends Investment {
+  unrealized_gain_loss: number;
+  unrealized_gain_loss_pct: number;
+  latest_price: number | null;
+  latest_price_date: string | null;
+  price_source: 'manual' | 'api' | null;
+  strategy_name?: string | null;
+  account_name?: string | null;
+}
+
+export interface InvestmentPriceUpdate {
+  id: number;
+  investment_id: number;
+  date: string;
+  price: number;
+  source: 'manual' | 'api';
+  created_at: string;
+}
+
+export interface Strategy {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface StrategyStage {
+  id: number;
+  strategy_id: number;
+  stage_order: number;
+  asset_type: string;
+  duration_months: number;
+  expected_return_pct: number;
+  created_at?: string;
+}
+
+export interface StrategyWithStages extends Strategy {
+  stages: StrategyStage[];
+}
+
+export interface CompoundingSimulationPoint {
+  stage_order: number;
+  asset_type: string;
+  duration_months: number;
+  cumulative_months: number;
+  starting_capital: number;
+  expected_return_pct: number;
+  gain_amount: number;
+  ending_capital: number;
+}
+
+export interface CompoundingSimulationResult {
+  strategy_id?: number | null;
+  strategy_name?: string | null;
+  starting_capital: number;
+  final_capital: number;
+  total_gain: number;
+  total_return_pct: number;
+  total_duration_months: number;
+  disclaimer: 'Projection, not a live position';
+  timeline: CompoundingSimulationPoint[];
+}
+
+export interface PortfolioSummary {
+  total_portfolio_value_ngn: number;
+  total_cost_basis_ngn: number;
+  total_gain_loss_ngn: number;
+  total_gain_loss_pct: number;
+  markets: {
+    ngx: { count: number; total_value_ngn: number; total_gain_loss_ngn: number };
+    global: { count: number; total_value_ngn: number; total_gain_loss_ngn: number };
+    crypto: { count: number; total_value_ngn: number; total_gain_loss_ngn: number };
+  };
+}
+

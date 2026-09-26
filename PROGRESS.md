@@ -89,7 +89,7 @@ This baseline documents core architectural decisions from the project specificat
 | 3 | **Two Dashboards** (Financial Health + Money Movement) | **Completed** | `0003_dashboards.sql` | 35/35 Passing | Precomputed Summaries, Net Worth Engine, Health & Ledger APIs, Nightly Cron Handler, React PWA Shell & Dashboards, Deployed API |
 | 4 | **Budgets** (Adherence %, Category Variance, Charts) | **Completed** | `0004_budgets.sql` | 55/55 Passing | Budgets Table, Exact Clamped Adherence Math, Paired Non-Isolation Invariant, Copy Previous Month, Screen 5 Budgets, Deployed API |
 | 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Completed** | `0005_commitments.sql` | 75/75 Passing | Goals & Dynamic Live Bucket Progress, Liabilities Engine, Recurring Scanner & Auto-Advance, Account Reconciliation Variance Engine, Screens 6 & 9, Deployed API |
-| 6 | **Investor Module** (Holdings, NGX Manual, Live Crypto, Simulator) | **Not Started** | None | Not Started | — |
+| 6 | **Investor Module** (Holdings, NGX Manual, Live Crypto, Simulator) | **Completed** | `0006_investor.sql` | 97/97 Passing | Investments Schema, Manual NGX Price Journal, KV-Cached Live Price Proxy (15m TTL), Staged Compounding Simulator & Chart, Screen 7 Investor UI, Deployed API |
 | 7 | **Purchase Calculator, Research Digest, CSV Export** | **Not Started** | None | Not Started | — |
 | 8 | **WealthVault Data Migration** (Ingestion Pipeline, Reconciliation) | **Not Started** | None | Not Started | — |
 
@@ -167,16 +167,38 @@ This baseline documents core architectural decisions from the project specificat
   - Added upcoming commitments reminder section with one-click confirmation to `LedgerDashboard.tsx`.
   - Mounted screens cleanly in `app/src/App.tsx`.
 
+### 4.6 Investor Module (Module 6)
+- **D1 Migration `0006_investor.sql`:**
+  - Created tables `investments`, `investment_price_updates`, `strategies`, and `strategy_stages` with supporting indexes. Seeded baseline templates (*"Conservative Capital Preservation"* and *"Balanced Wealth Accumulator"*). Applied locally and remotely to Cloudflare D1 `finance-app-db`.
+- **Portfolio Valuation & Gain/Loss Engine:**
+  - Computes unrealized gains/losses ($\text{Gain/Loss} = \text{Current Value} - \text{Cost Basis}$, $\text{Gain/Loss \%} = \frac{\text{Current Value} - \text{Cost Basis}}{\text{Cost Basis}} \times 100$) with safe handling for zero cost basis.
+  - Multi-currency portfolio summary aggregated into `NGN` using `getFxRate`, categorized into `ngx`, `global`, and `crypto` market allocations.
+- **NGX Manual Price Journal Engine:**
+  - Records manual unit price entries (`source = 'manual'`) into `investment_price_updates` and recalculates holding valuation $\text{current\_value} = \text{quantity} \times \text{price}$. Full price update history is preserved for forensic auditing.
+- **Live Crypto & Global Equities Proxy with KV Caching:**
+  - Endpoint `GET /api/investments/live-prices?symbols=...` implements Cloudflare KV (`env.CACHE`, TTL 15 minutes / 900s) to serve cached price feeds, preventing third-party rate limits while ensuring accurate market estimates.
+- **Staged Compounding Simulation Engine (Section 7, APP_LOGIC.md):**
+  - Evaluates multi-stage compounding capital curves:
+    $$\text{Capital}_k = \text{Capital}_{k-1} \times \left(1 + \frac{\text{Return}_k}{100}\right)$$
+  - Returns stage-by-stage capital progression, horizon milestones, and total yields.
+  - Invariant: Prominently and explicitly stamped with mandatory disclaimer: `"Projection, not a live position"`.
+- **Net Worth Engine Integration:**
+  - Verified `computeNetWorth` in `worker/lib/analytics.ts` dynamically queries `investments.current_value`, converts foreign holdings to `NGN` via FX rates, and folds asset totals into `total_assets`.
+- **Frontend Screen 7 (`app/src/screens/InvestorScreen.tsx`):**
+  - KPI summary row: Total Portfolio Value, Total Unrealized Gain/Loss, and Market Split.
+  - Market switcher tabs (`All Markets`, `NGX Equities & Fixed Income`, `Global Equities`, `Crypto`).
+  - Holdings table with dynamic gain/loss indicator badges, price source indicators (`manual` vs `live-price`), "+ Add Holding" modal, and holding-specific "Update Price" modal.
+  - Strategy Simulator tab with strategy selector, starting capital input, custom stage builder, smooth Chart.js capital progression curve, and disclaimer banner. Mounted under active `Investor` navigation tab.
+
 ---
 
 ## 5. Resume State & Next Step
-- **Current Position:** Module 5: Goals, Liabilities, Recurring Transactions & Reconciliation complete, fully tested (75/75 passing), migration `0005_commitments.sql` applied locally and remotely to `finance-app-db`, frontend built and bundled, and worker deployed to Cloudflare Edge.
-- **Last Applied Migration:** `0005_commitments.sql` (applied locally and remotely to `finance-app-db`).
-- **Next Step:** Module 6: Investor Module
-  - Author migration `worker/migrations/0006_investor.sql` (`investments`, `investment_price_updates`, `strategies`, `strategy_stages`).
-  - Implement manual NGX price update journal (`source = 'manual'`).
-  - Implement live crypto/global equities price proxy with KV caching (TTL 15 min).
-  - Implement staged compounding capital curve simulation engine:
-    $$\text{Capital}_k = \text{Capital}_{k-1} \times (1 + \text{Return}_k)$$
-  - Build Screen 7: Investor Module (NGX / Global / Crypto tabs, manual price modals, strategy simulator projection chart).
+- **Current Position:** Module 6: Investor Module complete, fully tested (97/97 passing), migration `0006_investor.sql` applied locally and remotely to `finance-app-db`, frontend built and bundled, and Screen 7 live.
+- **Last Applied Migration:** `0006_investor.sql` (applied locally and remotely to `finance-app-db`).
+- **Next Step:** Module 7: Purchase Calculator, Research Digest & CSV Export
+  - Author migration `worker/migrations/0007_tools.sql` (`purchase_calculations`, `digest_items`, `import_batches`).
+  - Implement 7-tier purchase risk ratio evaluator: $\text{Ratio} = (\text{Cost} / \text{NetWorth}_{\text{snapshot}}) \times 100$.
+  - Implement scheduled research digest worker cron trigger (weekly Monday).
+  - Implement full CSV data exporter (`GET /api/export?format=csv`).
+  - Build Screen 8 (Purchase Calculator), Screen 11 (Research Digest), and CSV Export settings UI.
 
