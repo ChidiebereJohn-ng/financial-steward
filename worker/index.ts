@@ -61,8 +61,14 @@ app.route('/api/strategies', strategiesRoutes);
 app.route('/api/imports', importsRoutes);
 app.route('/api', toolsRoutes);
 
-// Fallback 404
-app.notFound((c) => {
+// Fallback 404 for API, or proxy to static assets
+app.notFound(async (c) => {
+  if (c.req.path.startsWith('/api')) {
+    return c.json({ error: 'Endpoint not found' }, 404);
+  }
+  if (c.env.ASSETS) {
+    return c.env.ASSETS.fetch(c.req.raw);
+  }
   return c.json({ error: 'Endpoint not found' }, 404);
 });
 

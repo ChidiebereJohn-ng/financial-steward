@@ -18,3 +18,8 @@ crons = [
   "0 6 * * 1",      # weekly Monday: research digest generation
   "0 7 * * *"       # daily: recurring transaction due-check
 ]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"

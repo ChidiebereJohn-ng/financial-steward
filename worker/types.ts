@@ -3,6 +3,7 @@ export interface Env {
   CACHE: KVNamespace;
   DEV_AUTH_BYPASS?: string;
   SESSION_SECRET?: string;
+  ASSETS?: any;
 }
 
 export interface AppVariables {
