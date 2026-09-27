@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AllocationBucket, Env } from '../types';
 import { getBucketBalances, transferBetweenBuckets } from '../lib/ledger';
+import { normalizeDateToYyyyMmDd } from '../lib/importer';
 
 const bucketsApp = new Hono<{ Bindings: Env }>();
 
@@ -92,7 +93,8 @@ bucketsApp.post('/transfer', async (c) => {
   const fromId = Number(from_bucket_id);
   const toId = Number(to_bucket_id);
   const numAmount = Number(amount);
-  const transferDate = date || new Date().toISOString().split('T')[0];
+  const rawDate = date || new Date().toISOString().split('T')[0];
+  const transferDate = normalizeDateToYyyyMmDd(rawDate);
 
   if (isNaN(fromId) || isNaN(toId) || isNaN(numAmount)) {
     return c.json({ error: 'Bucket IDs and amount must be numeric' }, 400);

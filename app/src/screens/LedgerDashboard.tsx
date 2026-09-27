@@ -4,15 +4,25 @@ import { KpiCard } from '../components/KpiCard';
 import { BucketBadge } from '../components/BucketBadge';
 import { ReconcileModal } from '../components/ReconcileModal';
 import { ImportModal } from '../components/ImportModal';
+import { AddTransactionModal } from '../components/AddTransactionModal';
+import { TransferModal } from '../components/TransferModal';
 import type { LedgerDashboardData } from '../../../worker/types';
 
 export const LedgerDashboard: React.FC = () => {
   const [data, setData] = useState<LedgerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAddTxModal, setShowAddTxModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const [showReconcileModal, setShowReconcileModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Timeframe and filtering state
+  const [timeframe, setTimeframe] = useState<'all' | '30d'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [showAllTx, setShowAllTx] = useState(false);
 
   useEffect(() => {
     fetchLedgerData();
@@ -77,7 +87,13 @@ export const LedgerDashboard: React.FC = () => {
   const netDelta30 = totalInflows30 - totalOutflows30;
   const totalBucketFunds = data.buckets.reduce((sum, b) => sum + b.balance, 0);
 
-  // 30-Day Inflow / Outflow daily bar chart (rounded top corners, generous gap, faint baseline)
+  // Timeframe dynamic values
+  const hasAllTime = Boolean(data.all_time_totals);
+  const currentInflow = timeframe === 'all' && data.all_time_totals ? data.all_time_totals.total_inflow : totalInflows30;
+  const currentOutflow = timeframe === 'all' && data.all_time_totals ? data.all_time_totals.total_outflow : totalOutflows30;
+  const currentNetDelta = timeframe === 'all' && data.all_time_totals ? data.all_time_totals.net_delta : netDelta30;
+
+  // 30-Day Inflow / Outflow daily bar chart
   const dailySeries = data.daily_series;
   const inflowOutflowChartConfig = {
     type: 'bar' as const,
@@ -144,16 +160,61 @@ export const LedgerDashboard: React.FC = () => {
 
   const currentDateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+  // Filter & sort transactions accurately by canonical YYYY-MM-DD
+  const filteredTransactions = data.recent_transactions
+    .filter((tx) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        (tx.note && tx.note.toLowerCase().includes(q)) ||
+        (tx.purpose_label && tx.purpose_label.toLowerCase().includes(q)) ||
+        (tx.category_name && tx.category_name.toLowerCase().includes(q)) ||
+        (tx.bucket_name && tx.bucket_name.toLowerCase().includes(q)) ||
+        (tx.date && tx.date.includes(q)) ||
+        String(tx.amount).includes(q)
+      );
+    })
+    .sort((a, b) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) {
+        return sortOrder === 'desc' ? -dateCmp : dateCmp;
+      }
+      return sortOrder === 'desc' ? b.id - a.id : a.id - b.id;
+    });
+
+  const displayedTransactions = showAllTx ? filteredTransactions : filteredTransactions.slice(0, 15);
+
   return (
     <div>
-      {/* Top Bar with Search & Date */}
+      {/* Top Bar with Live Search & Date */}
       <div className="top-bar">
         <div className="search-box">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input type="text" placeholder="Search transactions, accounts, or buckets..." readOnly />
+          <input
+            type="text"
+            placeholder="Search transactions, accounts, categories, or buckets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                fontSize: '13px',
+                padding: '0 4px',
+              }}
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         <div className="date-pill">
@@ -170,11 +231,11 @@ export const LedgerDashboard: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
         <div>
           <h2 className="screen-title">Money Movement</h2>
-          <p className="screen-subtitle">Real-time bucket allocations, daily cash flow, and recent activity</p>
+          <p className="screen-subtitle">Real-time bucket allocations, cash flow analytics, and recent activity</p>
         </div>
 
-        {/* Quick Actions (Matching UI_SYSTEM_DESIGN.md) */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* Quick Actions */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             style={{
               padding: '9px 16px',
@@ -186,8 +247,10 @@ export const LedgerDashboard: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              cursor: 'pointer',
+              border: 'none',
             }}
-            onClick={() => alert('Add Transaction modal')}
+            onClick={() => setShowAddTxModal(true)}
           >
             <span>+</span> Add Transaction
           </button>
@@ -200,10 +263,14 @@ export const LedgerDashboard: React.FC = () => {
               borderRadius: 'var(--radius-sm)',
               fontWeight: 600,
               fontSize: '13px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
-            onClick={() => alert('Transfer modal')}
+            onClick={() => setShowTransferModal(true)}
           >
-            Transfer
+            <span>⇄</span> Transfer
           </button>
           <button
             style={{
@@ -250,7 +317,64 @@ export const LedgerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Top Stat Card Row (Matching Section 12 rule: 3-4 cards across top of both dashboards) */}
+      {/* Timeframe Selector Pill Tabs */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            Summary Timeframe:
+          </span>
+          <div
+            style={{
+              display: 'inline-flex',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '6px',
+              padding: '2px',
+              gap: '2px',
+            }}
+          >
+            <button
+              onClick={() => setTimeframe('all')}
+              style={{
+                padding: '5px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                backgroundColor: timeframe === 'all' ? 'var(--color-primary)' : 'transparent',
+                color: timeframe === 'all' ? '#ffffff' : 'var(--color-text-secondary)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              All Time {hasAllTime && ' (Imported)'}
+            </button>
+            <button
+              onClick={() => setTimeframe('30d')}
+              style={{
+                padding: '5px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                backgroundColor: timeframe === '30d' ? 'var(--color-primary)' : 'transparent',
+                color: timeframe === '30d' ? '#ffffff' : 'var(--color-text-secondary)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              Last 30 Days
+            </button>
+          </div>
+        </div>
+        {timeframe === 'all' && (
+          <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+            Displaying cumulative figures across all imported WealthVault and live records
+          </span>
+        )}
+      </div>
+
+      {/* Top Stat Card Row */}
       <div className="kpi-grid">
         <KpiCard
           label="Total Allocated Funds"
@@ -262,38 +386,38 @@ export const LedgerDashboard: React.FC = () => {
         />
 
         <KpiCard
-          label="30-Day Total Inflow"
-          value={formatNgn(totalInflows30)}
+          label={timeframe === 'all' ? 'All-Time Total Inflow' : '30-Day Total Inflow'}
+          value={formatNgn(currentInflow)}
           icon="↓"
           iconBg="rgba(22, 163, 74, 0.08)"
           iconColor="var(--color-positive)"
           trend={{
-            value: 'Inflows',
+            value: timeframe === 'all' ? 'Cumulative Inflow' : 'Inflows',
             direction: 'up',
           }}
         />
 
         <KpiCard
-          label="30-Day Total Outflow"
-          value={formatNgn(totalOutflows30)}
+          label={timeframe === 'all' ? 'All-Time Total Outflow' : '30-Day Total Outflow'}
+          value={formatNgn(currentOutflow)}
           icon="↑"
           iconBg="rgba(220, 38, 38, 0.08)"
           iconColor="var(--color-negative)"
           trend={{
-            value: 'Outflows',
+            value: timeframe === 'all' ? 'Cumulative Outflow' : 'Outflows',
             direction: 'down',
           }}
         />
 
         <KpiCard
-          label="30-Day Net Delta"
-          value={`${netDelta30 >= 0 ? '+' : ''}${formatNgn(netDelta30)}`}
+          label={timeframe === 'all' ? 'All-Time Net Delta' : '30-Day Net Delta'}
+          value={`${currentNetDelta >= 0 ? '+' : ''}${formatNgn(currentNetDelta)}`}
           icon="Δ"
-          iconBg={netDelta30 >= 0 ? 'rgba(22, 163, 74, 0.08)' : 'rgba(220, 38, 38, 0.08)'}
-          iconColor={netDelta30 >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'}
+          iconBg={currentNetDelta >= 0 ? 'rgba(22, 163, 74, 0.08)' : 'rgba(220, 38, 38, 0.08)'}
+          iconColor={currentNetDelta >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'}
           trend={{
-            value: netDelta30 >= 0 ? 'Surplus' : 'Deficit',
-            direction: netDelta30 >= 0 ? 'up' : 'down',
+            value: currentNetDelta >= 0 ? 'Surplus' : 'Deficit',
+            direction: currentNetDelta >= 0 ? 'up' : 'down',
           }}
         />
       </div>
@@ -326,7 +450,7 @@ export const LedgerDashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Upcoming Commitments (APP_LOGIC.md Section 9) */}
+      {/* Upcoming Commitments */}
       {data.upcoming_commitments && data.upcoming_commitments.length > 0 && (
         <div className="budget-variance-card" style={{ marginBottom: '24px', borderLeft: '4px solid #f59e0b' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -383,6 +507,8 @@ export const LedgerDashboard: React.FC = () => {
                       color: '#ffffff',
                       borderRadius: 'var(--radius-sm)',
                       opacity: confirmingId === item.id ? 0.7 : 1,
+                      cursor: 'pointer',
+                      border: 'none',
                     }}
                   >
                     {confirmingId === item.id ? 'Confirming...' : 'Confirm Payment'}
@@ -398,34 +524,74 @@ export const LedgerDashboard: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <ChartCard
           title="Daily Inflow & Outflow Activity"
-          subtitle="Cash movements over the past 30 days"
+          subtitle={dailySeries.length > 0 ? `Activity across ${dailySeries.length} recorded dates` : 'Cash movements over the past 30 days'}
           config={inflowOutflowChartConfig}
         />
       </div>
 
-      {/* Recent Transactions Feed (Matching Section 12 exact transaction row pattern) */}
+      {/* Transactions Feed with Live Search, Sorting, and Pagination */}
       <div className="transaction-card">
-        <div className="transaction-card-header">
+        <div className="transaction-card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              Recent Transactions
+              Transaction Activity
             </h3>
             <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-              Latest activity across all accounts
+              Showing {displayedTransactions.length} of {filteredTransactions.length} records
+              {searchQuery && ` (filtered by "${searchQuery}")`}
             </p>
           </div>
-          <span style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}>
-            View Full History →
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Date Sorting Toggle Button */}
+            <button
+              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              style={{
+                backgroundColor: 'var(--bg-subtle, #0f172a)',
+                border: '1px solid var(--border-color, #334155)',
+                borderRadius: 'var(--radius-sm, 6px)',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary, #94a3b8)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              title="Toggle chronological sorting"
+            >
+              <span>Date:</span>
+              <strong style={{ color: 'var(--color-text-primary, #f8fafc)' }}>
+                {sortOrder === 'desc' ? 'Newest First ↓' : 'Oldest First ↑'}
+              </strong>
+            </button>
+
+            {filteredTransactions.length > 15 && (
+              <span
+                onClick={() => setShowAllTx(!showAllTx)}
+                style={{
+                  fontSize: '13px',
+                  color: 'var(--color-primary)',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                {showAllTx ? 'Show Recent Only ↑' : `View Full History (${filteredTransactions.length}) →`}
+              </span>
+            )}
+          </div>
         </div>
 
-        {data.recent_transactions.length === 0 ? (
+        {filteredTransactions.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
-            No recent transactions recorded. Click "+ Add Transaction" to record your first transaction.
+            {searchQuery
+              ? `No transactions match "${searchQuery}".`
+              : 'No transactions recorded yet. Click "+ Add Transaction" or "Import CSV" to begin.'}
           </div>
         ) : (
           <div className="transaction-list">
-            {data.recent_transactions.map((tx) => (
+            {displayedTransactions.map((tx) => (
               <div key={tx.id} className="tx-row">
                 <div className="tx-left">
                   <div className={`tx-circle ${tx.direction}`}>
@@ -434,7 +600,8 @@ export const LedgerDashboard: React.FC = () => {
                   <div className="tx-details">
                     <h4>{tx.note || tx.purpose_label || tx.category_name || 'Transaction'}</h4>
                     <p>
-                      {tx.category_name || 'Inflow'} • {tx.date}
+                      {tx.category_name || (tx.direction === 'inflow' ? 'Income Allocation' : 'Expense')} • {tx.date}
+                      {tx.purpose_label && ` • Purpose: ${tx.purpose_label}`}
                     </p>
                   </div>
                 </div>
@@ -452,6 +619,30 @@ export const LedgerDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Add Transaction Modal */}
+      <AddTransactionModal
+        isOpen={showAddTxModal}
+        onClose={() => setShowAddTxModal(false)}
+        onSuccess={() => {
+          fetchLedgerData();
+          setFeedback({ type: 'success', text: 'Transaction recorded and ledger successfully updated!' });
+          setTimeout(() => setFeedback(null), 4000);
+        }}
+        buckets={data.buckets}
+      />
+
+      {/* Transfer Modal */}
+      <TransferModal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        onSuccess={() => {
+          fetchLedgerData();
+          setFeedback({ type: 'success', text: 'Bucket transfer executed successfully!' });
+          setTimeout(() => setFeedback(null), 4000);
+        }}
+        buckets={data.buckets}
+      />
 
       {/* Reconcile Modal */}
       <ReconcileModal

@@ -6,6 +6,7 @@ import {
   recordExpense,
   runAllocation,
 } from '../lib/ledger';
+import { normalizeDateToYyyyMmDd } from '../lib/importer';
 
 const transactionsApp = new Hono<{ Bindings: Env }>();
 
@@ -233,6 +234,8 @@ transactionsApp.post('/', async (c) => {
     }
   }
 
+  const normalizedDate = normalizeDateToYyyyMmDd(date);
+
   // Insert base transaction
   const insertRes = await c.env.DB.prepare(
     `INSERT INTO transactions 
@@ -241,7 +244,7 @@ transactionsApp.post('/', async (c) => {
   )
     .bind(
       external_id ?? null,
-      date,
+      normalizedDate,
       direction,
       subtype ?? null,
       numAmount,
@@ -259,7 +262,7 @@ transactionsApp.post('/', async (c) => {
   const transaction: Transaction = {
     id: transactionId,
     external_id: external_id ?? null,
-    date,
+    date: normalizedDate,
     direction,
     subtype: subtype ?? null,
     amount: numAmount,
@@ -318,6 +321,9 @@ transactionsApp.patch('/:id', async (c) => {
   }
 
   const changes = await c.req.json();
+  if (changes.date) {
+    changes.date = normalizeDateToYyyyMmDd(changes.date);
+  }
 
   try {
     const result = await editTransaction(c.env.DB, id, changes);

@@ -24,6 +24,91 @@ export function normalizeBucketKey(
 }
 
 /**
+ * Normalizes any date representation (ISO string, DD/MM/YYYY, MM/DD/YYYY, millisecond epoch, text dates)
+ * into a strict, canonical YYYY-MM-DD string.
+ * Guarantees accurate chronological sorting (ORDER BY date DESC) and SQLite date function support.
+ */
+export function normalizeDateToYyyyMmDd(val?: any): string {
+  if (!val) return new Date().toISOString().split('T')[0];
+  const s = String(val).trim();
+  if (!s) return new Date().toISOString().split('T')[0];
+
+  // 1. Millisecond or second epoch timestamp (numeric string: e.g. 1715520720000)
+  if (/^\d{10,13}$/.test(s)) {
+    const num = Number(s);
+    const ms = s.length === 10 ? num * 1000 : num;
+    const d = new Date(ms);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  }
+
+  // 2. YYYY-MM-DD or YYYY/MM/DD (with optional time or T)
+  const ymdMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (ymdMatch) {
+    const y = ymdMatch[1];
+    const m = ymdMatch[2].padStart(2, '0');
+    const d = ymdMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. DD/MM/YYYY or MM/DD/YYYY or DD-MM-YYYY
+  const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch) {
+    const part1 = Number(dmyMatch[1]);
+    const part2 = Number(dmyMatch[2]);
+    const y = dmyMatch[3];
+    let m: string;
+    let d: string;
+
+    if (part1 > 12) {
+      // First part > 12 -> must be day (DD/MM/YYYY)
+      d = String(part1).padStart(2, '0');
+      m = String(part2).padStart(2, '0');
+    } else if (part2 > 12) {
+      // Second part > 12 -> must be day (MM/DD/YYYY)
+      m = String(part1).padStart(2, '0');
+      d = String(part2).padStart(2, '0');
+    } else {
+      // Default to DD/MM/YYYY
+      d = String(part1).padStart(2, '0');
+      m = String(part2).padStart(2, '0');
+    }
+    return `${y}-${m}-${d}`;
+  }
+
+  // 4. Fallback: Native Date.parse for text formats like "Sep 25, 2024"
+  const parsed = Date.parse(s);
+  if (!isNaN(parsed)) {
+    return new Date(parsed).toISOString().split('T')[0];
+  }
+
+  return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Automatically repairs any historical non-canonical dates in transactions and bucket_ledger_entries.
+ */
+export async function repairHistoricalDates(db: D1Database): Promise<{ repaired: number }> {
+  try {
+    const { results: invalidTxs } = await db
+      .prepare("SELECT id, date FROM transactions WHERE date NOT LIKE '____-__-__'")
+      .all<{ id: number; date: string }>();
+
+    let count = 0;
+    for (const tx of invalidTxs) {
+      const fixed = normalizeDateToYyyyMmDd(tx.date);
+      await db.prepare('UPDATE transactions SET date = ? WHERE id = ?').bind(fixed, tx.id).run();
+      await db.prepare('UPDATE bucket_ledger_entries SET date = ? WHERE transaction_id = ?').bind(fixed, tx.id).run();
+      count++;
+    }
+    return { repaired: count };
+  } catch {
+    return { repaired: 0 };
+  }
+}
+
+/**
  * Parses raw CSV text according to RFC 4180 specification.
  * Handles quoted fields, embedded newlines (\r\n and \n), escaped quotes (""), and commas.
  */
@@ -308,13 +393,7 @@ export async function processWealthVaultImport(
         continue;
       }
 
-      let dateStr = (row.date || '').trim();
-      if (dateStr.includes('T')) {
-        dateStr = dateStr.split('T')[0];
-      }
-      if (!dateStr || dateStr.length < 8) {
-        dateStr = new Date().toISOString().split('T')[0];
-      }
+      const dateStr = normalizeDateToYyyyMmDd(row.date);
 
       const direction = row.direction === 'inflow' ? 'inflow' : 'outflow';
       const currency = row.currency || 'NGN';

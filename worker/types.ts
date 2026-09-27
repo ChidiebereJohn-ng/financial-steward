@@ -216,6 +216,11 @@ export interface LedgerDashboardData {
   }>;
   recent_transactions: Array<Transaction & { category_name?: string; bucket_name?: string; account_name?: string }>;
   upcoming_commitments?: RecurringWithDue[];
+  all_time_totals?: {
+    total_inflow: number;
+    total_outflow: number;
+    net_delta: number;
+  };
 }
 
 export interface Budget {

@@ -6,6 +6,7 @@ import type {
   Transaction,
 } from '../types';
 import { getBucketBalances } from './ledger';
+import { repairHistoricalDates } from './importer';
 
 /**
  * Retrieves the applicable FX rate to convert fromCurrency to toCurrency on or nearest before asOfDate.
@@ -500,11 +501,33 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
  * Aggregates real-time metrics for Screen 2: Money Movement / Ledger Dashboard.
  */
 export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDashboardData> {
+  // 0. Auto-repair any non-canonical dates in database to ensure proper chronological sorting
+  await repairHistoricalDates(db);
+
   // 1. Live bucket cards
   const buckets = await getBucketBalances(db);
 
-  // 2. Daily inflow/outflow series for past 30 days
-  const { results: dailyRaw } = await db
+  // 2. All-time inflow/outflow totals across entire database
+  const allTimeTotalsRaw = await db
+    .prepare(
+      `SELECT 
+         COALESCE(SUM(CASE WHEN direction = 'inflow' THEN amount ELSE 0 END), 0) as total_inflow,
+         COALESCE(SUM(CASE WHEN direction = 'outflow' THEN amount ELSE 0 END), 0) as total_outflow
+       FROM transactions
+       WHERE (note IS NULL OR note NOT LIKE '[DELETED]%')`
+    )
+    .first<{ total_inflow: number; total_outflow: number }>();
+
+  const allTimeInflow = allTimeTotalsRaw?.total_inflow || 0;
+  const allTimeOutflow = allTimeTotalsRaw?.total_outflow || 0;
+  const allTimeTotals = {
+    total_inflow: Math.round(allTimeInflow * 100) / 100,
+    total_outflow: Math.round(allTimeOutflow * 100) / 100,
+    net_delta: Math.round((allTimeInflow - allTimeOutflow) * 100) / 100,
+  };
+
+  // 3. Daily inflow/outflow series (past 30 days, or fallback to most recent active 30 dates)
+  let { results: dailyRaw } = await db
     .prepare(
       `SELECT 
          date,
@@ -518,13 +541,31 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
     )
     .all<{ date: string; inflow: number; outflow: number }>();
 
+  // If no transactions exist in the last 30 days (e.g. historical import), retrieve the most recent active dates
+  if (dailyRaw.length === 0) {
+    const { results: fallbackRaw } = await db
+      .prepare(
+        `SELECT 
+           date,
+           COALESCE(SUM(CASE WHEN direction = 'inflow' THEN amount ELSE 0 END), 0) as inflow,
+           COALESCE(SUM(CASE WHEN direction = 'outflow' THEN amount ELSE 0 END), 0) as outflow
+         FROM transactions
+         WHERE (note IS NULL OR note NOT LIKE '[DELETED]%')
+         GROUP BY date
+         ORDER BY date DESC
+         LIMIT 30`
+      )
+      .all<{ date: string; inflow: number; outflow: number }>();
+    dailyRaw = fallbackRaw.reverse();
+  }
+
   const dailySeries = dailyRaw.map((d) => ({
     date: d.date,
     inflow: Math.round(d.inflow * 100) / 100,
     outflow: Math.round(d.outflow * 100) / 100,
   }));
 
-  // 3. Recent 10 transactions
+  // 4. Recent transactions (up to 50 transactions, ordered chronologically newest first)
   const { results: recent } = await db
     .prepare(
       `SELECT 
@@ -540,11 +581,11 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
        WHERE (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
        GROUP BY t.id
        ORDER BY t.date DESC, t.id DESC
-       LIMIT 10`
+       LIMIT 50`
     )
     .all<Transaction & { category_name?: string; bucket_name?: string; account_name?: string }>();
 
-  // 4. Upcoming commitments (due in <= 3 days, active)
+  // 5. Upcoming commitments (due in <= 3 days, active)
   let upcoming: any[] = [];
   try {
     const { getRecurringTransactions } = await import('./commitments');
@@ -559,5 +600,6 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
     daily_series: dailySeries,
     recent_transactions: recent,
     upcoming_commitments: upcoming,
+    all_time_totals: allTimeTotals,
   };
 }
