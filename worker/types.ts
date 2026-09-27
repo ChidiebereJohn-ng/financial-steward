@@ -467,3 +467,57 @@ export interface ImportBatch {
   imported_at: string;
 }
 
+export interface WealthVaultCsvRow {
+  external_id?: string;
+  date: string;
+  direction: 'inflow' | 'outflow';
+  subtype?: 'bucket_deploy' | 'bucket_transfer' | string | null;
+  amount: number;
+  currency?: string;
+  category?: string | null;
+  note?: string | null;
+  purpose_label?: string | null;
+  bucket?: string | null;
+  from_bucket?: string | null;
+  to_bucket?: string | null;
+  split_tithe?: number | null;
+  split_kingdom?: number | null;
+  split_savings?: number | null;
+  split_invest?: number | null;
+  split_charity?: number | null;
+  split_expense?: number | null;
+  is_override?: boolean | number;
+}
+
+export interface BucketReconciliationItem {
+  bucket_id: number;
+  bucket_key: string;
+  bucket_name: string;
+  source_total: number;
+  ledger_total: number;
+  live_balance: number;
+  variance: number;
+  reconciled: boolean;
+}
+
+export interface ReconciliationReport {
+  batch_id: number;
+  file_name: string;
+  reconciled: boolean;
+  total_variance: number;
+  buckets: BucketReconciliationItem[];
+  timestamp: string;
+}
+
+export interface ImportProcessingResult {
+  batch_id: number;
+  file_name: string;
+  total_rows: number;
+  imported_count: number;
+  skipped_count: number;
+  failed_count: number;
+  status: 'completed' | 'failed';
+  reconciliation: ReconciliationReport;
+  errors: Array<{ row: number; error: string; data?: any }>;
+}
+

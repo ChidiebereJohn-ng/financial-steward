@@ -3,12 +3,14 @@ import { ChartCard } from '../components/ChartCard';
 import { KpiCard } from '../components/KpiCard';
 import { BucketBadge } from '../components/BucketBadge';
 import { ReconcileModal } from '../components/ReconcileModal';
+import { ImportModal } from '../components/ImportModal';
 import type { LedgerDashboardData } from '../../../worker/types';
 
 export const LedgerDashboard: React.FC = () => {
   const [data, setData] = useState<LedgerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showReconcileModal, setShowReconcileModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -215,10 +217,29 @@ export const LedgerDashboard: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              cursor: 'pointer',
             }}
             onClick={() => setShowReconcileModal(true)}
           >
             <span>⚖️</span> Reconcile
+          </button>
+          <button
+            style={{
+              padding: '9px 14px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--color-text-secondary)',
+              borderRadius: 'var(--radius-sm)',
+              fontWeight: 600,
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+            }}
+            onClick={() => setShowImportModal(true)}
+          >
+            <span>📥</span> Import CSV
           </button>
         </div>
       </div>
@@ -439,6 +460,17 @@ export const LedgerDashboard: React.FC = () => {
         onReconciled={() => {
           fetchLedgerData();
           setFeedback({ type: 'success', text: 'Account reconciliation logged.' });
+          setTimeout(() => setFeedback(null), 4000);
+        }}
+      />
+
+      {/* Import WealthVault CSV Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          fetchLedgerData();
+          setFeedback({ type: 'success', text: 'WealthVault CSV successfully imported and reconciled!' });
           setTimeout(() => setFeedback(null), 4000);
         }}
       />

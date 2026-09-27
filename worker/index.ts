@@ -16,6 +16,7 @@ import recurringRoutes from './routes/recurring';
 import investorRoutes from './routes/investor';
 import strategiesRoutes from './routes/strategies';
 import toolsRoutes from './routes/tools';
+import importsRoutes from './routes/imports';
 import { refreshMonthlySummaries, computeNetWorth } from './lib/analytics';
 import { getRecurringTransactions } from './lib/commitments';
 
@@ -36,7 +37,7 @@ app.get('/api/health', (c) => {
   return c.json({
     status: 'ok',
     app: 'Financial Steward API',
-    module: 'Module 7: Purchase Calculator, Research Digest & CSV Export',
+    module: 'Module 7 & Module 8: WealthVault Data Migration Engine & Reconciliation',
     timestamp: new Date().toISOString()
   });
 });
@@ -57,6 +58,7 @@ app.route('/api/liabilities', liabilitiesRoutes);
 app.route('/api/recurring', recurringRoutes);
 app.route('/api/investments', investorRoutes);
 app.route('/api/strategies', strategiesRoutes);
+app.route('/api/imports', importsRoutes);
 app.route('/api', toolsRoutes);
 
 // Fallback 404

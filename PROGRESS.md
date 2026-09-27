@@ -91,7 +91,7 @@ This baseline documents core architectural decisions from the project specificat
 | 5 | **Goals, Liabilities, Recurring, Reconciliation** | **Completed** | `0005_commitments.sql` | 75/75 Passing | Goals & Dynamic Live Bucket Progress, Liabilities Engine, Recurring Scanner & Auto-Advance, Account Reconciliation Variance Engine, Screens 6 & 9, Deployed API |
 | 6 | **Investor Module** (Holdings, NGX Manual, Live Crypto, Simulator) | **Completed** | `0006_investor.sql` | 97/97 Passing | Investments Schema, Manual NGX Price Journal, KV-Cached Live Price Proxy (15m TTL), Staged Compounding Simulator & Chart, Screen 7 Investor UI, Deployed API |
 | 7 | **Purchase Calculator, Research Digest, CSV Export** | **Completed** | `0007_tools.sql` | 122/122 Passing | Purchase Calculations Schema, 7-Tier Risk Ratio Evaluator, Net Worth Snapshot Grounding Invariant, Curated Research Digest, RFC 4180 Full CSV Exporter, Screen 8 & Screen 11 UI, Deployed API |
-| 8 | **WealthVault Data Migration** (Ingestion Pipeline, Reconciliation) | **Not Started** | None | Not Started | — |
+| 8 | **WealthVault Data Migration** (Ingestion Pipeline, Reconciliation) | **Completed** | `0007_tools.sql` | 138/138 Passing | RFC 4180 19-Column CSV Ingestion Engine, Idempotent Deduplication (`external_id`), Historical Snapshot Allocation Runs, Two-Legged Transfer & Deploy Subtypes, Zero-Variance Ledger Reconciliation Audit, `ImportModal` in `LedgerDashboard`, Deployed API |
 
 ---
 
@@ -214,15 +214,34 @@ This baseline documents core architectural decisions from the project specificat
   - Built `app/src/components/CsvExportCard.tsx` providing a one-click CSV download experience.
   - Mounted cleanly inside the "Tools & Settings" (`more`) sub-navigation in `app/src/App.tsx`.
 
+### 4.8 WealthVault Data Migration Engine & Reconciliation (Module 8)
+- **RFC 4180 19-Column CSV Ingestion Engine (`worker/lib/importer.ts`):**
+  - Robust parser supporting quotes, commas, newlines, escaped quotes (`""`), and CRLF/LF line endings for the 19 standard WealthVault Firestore export columns (`external_id`, `date`, `direction`, `subtype`, `amount`, `currency`, `category`, `note`, `purpose_label`, `bucket`, `from_bucket`, `to_bucket`, `split_tithe` ... `split_expense`, `is_override`).
+- **Idempotent Ingestion & Deduplication Invariant:**
+  - Every WealthVault document ID maps to `transactions.external_id` (enforced via database-level `UNIQUE(external_id)` constraint).
+  - Pre-filtering against existing database keys skips duplicates without double-crediting or drifting bucket balances.
+- **Historical Allocation Lineage Reconstruction:**
+  - Inflows with snapshot split columns accurately reconstruct `allocation_runs` and append matching `allocation_credit` entries to `bucket_ledger_entries`.
+  - Inflows without snapshot splits safely fall back to the active Six-Bucket Waterfall rule (10/20/20/20/10/50).
+- **Subtype Nuance Handling:**
+  - `subtype = 'bucket_transfer'`: Reconstructs two-legged balanced transfers (`transfer_out` and `transfer_in` in `bucket_ledger_entries`, atomically linked in `bucket_transfers`).
+  - `subtype = 'bucket_deploy'`: Records an explicit `expense_debit` against the designated target bucket.
+  - Standard outflows debit the resolved category default bucket (or `expense`).
+- **Zero-Variance Ledger Reconciliation Validator (`worker/lib/reconciliation.ts`):**
+  - Mathematically audits that post-import ledger balances strictly equal historical source net amounts ($\Delta = \text{₦0.00}$) across all 6 buckets.
+  - Generates structured audit reports with per-bucket breakdowns.
+- **Batch Audit Logging & API Endpoints:**
+  - Tracks every upload inside `import_batches` (`file_name`, `row_count`, `status`, `error_log`, `imported_at`).
+  - Implemented `POST /api/transactions/import`, `GET /api/imports`, `GET /api/imports/:id`, and `GET /api/imports/:id/reconcile`.
+- **Frontend Integration (`ImportModal.tsx` & `LedgerDashboard.tsx`):**
+  - Built `app/src/components/ImportModal.tsx` with drag-and-drop CSV zone, schema reference, progress feedback, summary cards (Total, Imported, Skipped, Errors), and the live 6-bucket zero-variance reconciliation audit card.
+  - Mounted an "Import CSV" action button inside the quick actions toolbar of `LedgerDashboard.tsx`.
+
 ---
 
-## 5. Resume State & Next Step
-- **Current Position:** Module 7: Purchase Calculator, Research Digest & CSV Export complete, fully tested (122/122 passing), migration `0007_tools.sql` applied locally and remotely to `finance-app-db`, frontend built and bundled, Screens 8 & 11 live, and Worker deployed.
-- **Last Applied Migration:** `0007_tools.sql` (applied locally and remotely to `finance-app-db`).
-- **Next Step:** Module 8: WealthVault Data Migration
-  - Implement 19-column RFC 4180 CSV parser for historical transactions.
-  - Deduplicate on `transactions.external_id`.
-  - Reconstruct `allocation_runs` from historical snapshot columns (`split_tithe` ... `split_expense`).
-  - Generate historical `bucket_ledger_entries` for inflows and subtype migrations (`bucket_deploy` / `bucket_transfer`).
-  - Implement post-import ledger reconciliation to verify zero balance variance against WealthVault bucket totals.
+## 5. Resume State & Project Completion
+- **Current Position:** All 8 planned modules are **100% Completed, Verified, and Deployed!**
+- **Test Suite State:** 138/138 Vitest tests passing across 8 test suites.
+- **Production Build:** Frontend React 19 + TypeScript PWA bundled cleanly via Vite into `/dist`.
+- **Cloudflare Edge Deployment:** Hono Worker deployed and active at `https://personal-finance-app.chidieberejohnchukwuemeka.workers.dev` backed by Cloudflare D1 `finance-app-db` and KV `CACHE`.
 

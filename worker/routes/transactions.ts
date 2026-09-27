@@ -361,4 +361,31 @@ transactionsApp.delete('/:id', async (c) => {
   }
 });
 
+/**
+ * POST /api/transactions/import
+ * Ingests a WealthVault 19-column CSV export file.
+ * Idempotently deduplicates, reconstructs allocation runs, and validates zero variance reconciliation.
+ */
+transactionsApp.post('/import', async (c) => {
+  try {
+    const { extractCsvFromRequest } = await import('./imports');
+    const { parseWealthVaultCsv, processWealthVaultImport } = await import('../lib/importer');
+    const { csvContent, fileName } = await extractCsvFromRequest(c);
+
+    if (!csvContent || csvContent.trim().length === 0) {
+      return c.json({ error: 'No CSV content provided' }, 400);
+    }
+
+    const rows = parseWealthVaultCsv(csvContent);
+    if (rows.length === 0) {
+      return c.json({ error: 'No valid data rows found in the provided CSV file' }, 400);
+    }
+
+    const result = await processWealthVaultImport(c.env.DB, fileName, rows);
+    return c.json(result, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Failed to process CSV import' }, 400);
+  }
+});
+
 export default transactionsApp;
