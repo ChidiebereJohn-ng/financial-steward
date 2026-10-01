@@ -88,6 +88,46 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
     onClose();
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = [
+      'external_id',
+      'date',
+      'direction',
+      'subtype',
+      'amount',
+      'currency',
+      'category',
+      'note',
+      'purpose_label',
+      'bucket',
+      'from_bucket',
+      'to_bucket',
+      'split_tithe',
+      'split_kingdom',
+      'split_savings',
+      'split_invest',
+      'split_charity',
+      'split_expense',
+      'is_override',
+    ].join(',');
+
+    const sampleRows = [
+      'wv_sample_01,2026-10-01,inflow,,100000.00,NGN,Salary,October Stewardship Income,,expenses,,,,10000.00,20000.00,14000.00,14000.00,7000.00,35000.00,0',
+      'wv_sample_02,2026-10-01,outflow,,15000.00,NGN,Utilities,Internet Subscription,Internet Bills,expenses,,,,,,,,,,',
+    ].join('\n');
+
+    const csvContent = `${headers}\n${sampleRows}\n`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'financial_steward_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const formatNgn = (num: number) => {
     return '₦' + Math.abs(num).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
@@ -237,6 +277,51 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSuc
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Download CSV Template Action Card */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  marginBottom: '16px',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-primary, #3b82f6)' }}>
+                    📥 Need a starter spreadsheet template?
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary, #94a3b8)', marginTop: '2px' }}>
+                    Download the pre-formatted 19-column CSV template, edit in Excel/Google Sheets, and upload here.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  style={{
+                    padding: '8px 14px',
+                    backgroundColor: 'var(--color-primary, #3b82f6)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm, 6px)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span>⬇</span> Download CSV Template
+                </button>
               </div>
 
               {/* Supported Columns Guide */}

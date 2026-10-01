@@ -297,8 +297,9 @@ describe('Module 6: Investor Module (Holdings, NGX Manual Journal, Live Crypto P
 
     it('should retrieve historical price updates for a holding', async () => {
       const ngxHolding = (await getInvestments(mockEnv.DB, { market: 'NGX' })).investments[0];
-      // Add second update
-      await recordPriceUpdate(mockEnv.DB, ngxHolding.id, 750, '2026-09-27', 'manual');
+      // Add second update with today's date
+      const today = new Date().toISOString().split('T')[0];
+      await recordPriceUpdate(mockEnv.DB, ngxHolding.id, 750, today, 'manual');
 
       const history = await getPriceHistory(mockEnv.DB, ngxHolding.id);
       expect(history.length).toBeGreaterThanOrEqual(2);

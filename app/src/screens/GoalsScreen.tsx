@@ -52,7 +52,7 @@ export const GoalsScreen: React.FC = () => {
       });
       if (res.ok) {
         const json = await res.json();
-        setBuckets(json.buckets || []);
+        setBuckets(json.data || json.buckets || []);
       }
     } catch (err) {
       console.error('Failed to load buckets:', err);

@@ -317,9 +317,16 @@ export const HealthDashboard: React.FC = () => {
                     <div
                       className="progress-bar"
                       style={{
-                        width: cat.planned > 0 ? `${Math.min((cat.actual / cat.planned) * 100, 100)}%` : '100%',
+                        width:
+                          cat.actual === 0
+                            ? '0%'
+                            : cat.planned > 0
+                            ? `${Math.min((cat.actual / cat.planned) * 100, 100)}%`
+                            : '100%',
                         backgroundColor:
                           cat.planned > 0 && cat.actual > cat.planned
+                            ? 'var(--color-negative)'
+                            : cat.planned === 0 && cat.actual > 0
                             ? 'var(--color-negative)'
                             : 'var(--color-primary)',
                       }}

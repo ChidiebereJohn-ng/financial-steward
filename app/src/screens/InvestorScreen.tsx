@@ -51,10 +51,32 @@ export const InvestorScreen: React.FC = () => {
   const [simulationResult, setSimulationResult] = useState<CompoundingSimulationResult | null>(null);
   const [simulating, setSimulating] = useState(false);
 
+  // Live crypto prices state
+  const [livePrices, setLivePrices] = useState<Record<string, { symbol: string; price_usd: number; price_ngn: number; change_24h_pct: number; cached: boolean; updated_at: string }>>({});
+  const [loadingPrices, setLoadingPrices] = useState(false);
+
   useEffect(() => {
     fetchInvestments();
     fetchStrategies();
+    fetchLivePrices();
   }, []);
+
+  const fetchLivePrices = async () => {
+    try {
+      setLoadingPrices(true);
+      const res = await fetch('/api/investments/live-prices?symbols=BTC,ETH,SOL,USDT,BNB', {
+        headers: { 'x-dev-bypass': 'true' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setLivePrices(json.prices || {});
+      }
+    } catch (err) {
+      console.error('Error fetching live crypto prices:', err);
+    } finally {
+      setLoadingPrices(false);
+    }
+  };
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setFeedback({ type, text });
@@ -154,13 +176,28 @@ export const InvestorScreen: React.FC = () => {
   const handleOpenAddHolding = () => {
     setEditingHolding(null);
     setSymbolOrName('');
-    setType('equity');
-    setMarket('NGX');
+    setType(selectedMarket === 'crypto' ? 'crypto' : 'equity');
+    setMarket(selectedMarket === 'crypto' ? 'crypto' : selectedMarket === 'global' ? 'global' : 'NGX');
     setQuantity('');
     setCostBasis('');
-    setCurrency('NGN');
+    setCurrency(selectedMarket === 'crypto' ? 'USD' : 'NGN');
     setCurrentValue('');
     setInitialPrice('');
+    setStrategyId('');
+    setShowAddModal(true);
+  };
+
+  // Quick-track crypto from live proxy
+  const handleTrackCrypto = (coin: { symbol: string; price_usd: number; price_ngn: number }) => {
+    setEditingHolding(null);
+    setSymbolOrName(coin.symbol);
+    setType('crypto');
+    setMarket('crypto');
+    setCurrency('USD');
+    setQuantity(1);
+    setCostBasis(coin.price_usd);
+    setCurrentValue(coin.price_usd);
+    setInitialPrice(coin.price_usd);
     setStrategyId('');
     setShowAddModal(true);
   };
@@ -508,6 +545,130 @@ export const InvestorScreen: React.FC = () => {
             </button>
           </div>
 
+          {/* Live Crypto Market Tracker Card */}
+          {(selectedMarket === 'crypto' || selectedMarket === 'all') && (
+            <div
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-color)',
+                padding: '20px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⚡ Live Crypto Market Proxy</span>
+                    <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', backgroundColor: 'rgba(234, 88, 12, 0.15)', color: '#ea580c', fontWeight: 700 }}>
+                      REAL-TIME FEED
+                    </span>
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Live USD & NGN rates cached at edge (15-min KV). Click "+ Track in Portfolio" on any coin to log your personal holding.
+                  </p>
+                </div>
+
+                <button
+                  onClick={fetchLivePrices}
+                  disabled={loadingPrices}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid var(--border-color)',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: 'var(--color-text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {loadingPrices ? 'Refreshing...' : '↻ Refresh Prices'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                {[
+                  { symbol: 'BTC', name: 'Bitcoin', icon: '₿' },
+                  { symbol: 'ETH', name: 'Ethereum', icon: 'Ξ' },
+                  { symbol: 'SOL', name: 'Solana', icon: '◎' },
+                  { symbol: 'USDT', name: 'Tether USD', icon: '₮' },
+                  { symbol: 'BNB', name: 'BNB Chain', icon: '🔶' },
+                ].map((coin) => {
+                  const priceData = livePrices[coin.symbol] || {
+                    price_usd: coin.symbol === 'BTC' ? 68500 : coin.symbol === 'ETH' ? 3550 : coin.symbol === 'SOL' ? 155 : coin.symbol === 'USDT' ? 1.0 : 590,
+                    price_ngn: coin.symbol === 'BTC' ? 113025000 : coin.symbol === 'ETH' ? 5857500 : coin.symbol === 'SOL' ? 255750 : coin.symbol === 'USDT' ? 1650 : 973500,
+                    change_24h_pct: coin.symbol === 'SOL' ? -0.5 : 1.8,
+                  };
+                  const isUp = priceData.change_24h_pct >= 0;
+
+                  return (
+                    <div
+                      key={coin.symbol}
+                      style={{
+                        padding: '14px',
+                        backgroundColor: 'var(--bg-subtle, #0f172a)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '18px' }}>{coin.icon}</span>
+                            <div>
+                              <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{coin.symbol}</strong>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{coin.name}</div>
+                            </div>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: isUp ? 'var(--color-positive)' : 'var(--color-negative)',
+                            }}
+                          >
+                            {isUp ? '▲' : '▼'} {Math.abs(priceData.change_24h_pct)}%
+                          </span>
+                        </div>
+
+                        <div style={{ marginTop: '12px' }}>
+                          <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            ${priceData.price_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            ≈ ₦{priceData.price_ngn.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleTrackCrypto({ symbol: coin.symbol, price_usd: priceData.price_usd, price_ngn: priceData.price_ngn })}
+                        style={{
+                          marginTop: '12px',
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                          border: '1px solid rgba(234, 88, 12, 0.3)',
+                          color: '#ea580c',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                        }}
+                      >
+                        + Track in Portfolio
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Holdings Table Card */}
           <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
             {loading ? (
@@ -516,7 +677,11 @@ export const InvestorScreen: React.FC = () => {
               </div>
             ) : filteredInvestments.length === 0 ? (
               <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px' }}>No holdings found in this market category.</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px' }}>
+                  {selectedMarket === 'crypto'
+                    ? 'No personal crypto holdings recorded in your portfolio yet. Use the "+ Track in Portfolio" buttons above to track your positions!'
+                    : 'No holdings found in this market category.'}
+                </p>
                 <button
                   onClick={handleOpenAddHolding}
                   style={{

@@ -21,6 +21,10 @@ export const ReconcileModal: React.FC<ReconcileModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ReconciliationResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newAccountType, setNewAccountType] = useState('checking');
+  const [creatingAccount, setCreatingAccount] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -48,6 +52,36 @@ export const ReconcileModal: React.FC<ReconcileModalProps> = ({
       }
     } catch (err) {
       console.error('Failed to fetch accounts:', err);
+    }
+  };
+
+  const handleCreateAccount = async () => {
+    if (!newAccountName.trim()) {
+      setErrorMessage('Account name is required');
+      return;
+    }
+    try {
+      setCreatingAccount(true);
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
+        body: JSON.stringify({ name: newAccountName.trim(), type: newAccountType, currency: 'NGN' }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const created = json.account;
+        setNewAccountName('');
+        setShowAddAccount(false);
+        await fetchAccounts();
+        if (created?.id) setSelectedAccountId(created.id);
+      } else {
+        const err = await res.json();
+        setErrorMessage(err.error || 'Failed to create account');
+      }
+    } catch {
+      setErrorMessage('Network error creating account');
+    } finally {
+      setCreatingAccount(false);
     }
   };
 
@@ -247,6 +281,45 @@ export const ReconcileModal: React.FC<ReconcileModalProps> = ({
                   </option>
                 ))}
               </select>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAccount(!showAddAccount)}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {showAddAccount ? 'Cancel' : '+ Add New Bank Account'}
+                </button>
+              </div>
+
+              {showAddAccount && (
+                <div style={{ marginTop: '8px', padding: '10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="e.g. Zenith Bank"
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    style={{ flex: 1, padding: '6px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
+                  />
+                  <select
+                    value={newAccountType}
+                    onChange={(e) => setNewAccountType(e.target.value)}
+                    style={{ padding: '6px 8px', fontSize: '12px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
+                  >
+                    <option value="checking">Checking</option>
+                    <option value="savings">Savings</option>
+                    <option value="cash">Cash</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleCreateAccount}
+                    disabled={creatingAccount}
+                    style={{ padding: '6px 12px', backgroundColor: 'var(--color-primary)', color: '#ffffff', borderRadius: '4px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {creatingAccount ? 'Saving...' : 'Add'}
+                  </button>
+                </div>
+              )}
+
               {selectedAccount?.last_reconciled_date && (
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
                   Last reconciled: {selectedAccount.last_reconciled_date} ({formatNgn(selectedAccount.last_reconciled_balance || 0)})

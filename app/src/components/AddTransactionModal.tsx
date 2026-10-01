@@ -134,6 +134,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       return;
     }
 
+    if (direction === 'inflow' && customSplit) {
+      const remSum = savingsPct + investPct + charityPct + expensePct;
+      if (Math.abs(remSum - 100) > 0.01) {
+        setError(`Remainder percentages must sum to 100% (currently ${remSum}%). Please adjust Savings, Invest, Charity, or Expense.`);
+        return;
+      }
+    }
+
     if (direction === 'outflow') {
       if (!categoryId) {
         setError('Please select an expense category.');
@@ -521,6 +529,152 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     <strong className="tabular-nums">{formatNgn(previewExpense)}</strong>
                   </div>
                 </div>
+
+                {/* Interactive Custom Split Control Panel */}
+                {customSplit && (
+                  <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                        Phase 1: Gross Deductions
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTithePct(10);
+                            setKingdomPct(20);
+                            setSavingsPct(20);
+                            setInvestPct(20);
+                            setCharityPct(10);
+                            setExpensePct(50);
+                          }}
+                          style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+                        >
+                          Default 10/20
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTithePct(50);
+                            setKingdomPct(0);
+                            setSavingsPct(0);
+                            setInvestPct(0);
+                            setCharityPct(0);
+                            setExpensePct(100);
+                          }}
+                          style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--color-primary)', background: 'rgba(37,99,235,0.1)', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          50% Tithe / 50% Exp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTithePct(0);
+                            setKingdomPct(0);
+                            setSavingsPct(0);
+                            setInvestPct(0);
+                            setCharityPct(0);
+                            setExpensePct(100);
+                          }}
+                          style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+                        >
+                          100% Expense
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '3px' }}>
+                          Tithe (% of gross)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={tithePct}
+                          onChange={(e) => setTithePct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '3px' }}>
+                          Kingdom Investment (% of gross)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={kingdomPct}
+                          onChange={(e) => setKingdomPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-primary)', fontSize: '13px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                        Phase 2: Remainder Base ({100 - tithePct - kingdomPct}% of gross)
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: (savingsPct + investPct + charityPct + expensePct === 100) ? 'var(--color-positive)' : 'var(--color-negative)',
+                        }}
+                      >
+                        Sum: {savingsPct + investPct + charityPct + expensePct}% {savingsPct + investPct + charityPct + expensePct === 100 ? '✓' : '(Must = 100%)'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)', marginBottom: '2px' }}>Savings %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={savingsPct}
+                          onChange={(e) => setSavingsPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          style={{ width: '100%', padding: '6px 4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-primary)', fontSize: '12px', textAlign: 'center', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)', marginBottom: '2px' }}>Invest %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={investPct}
+                          onChange={(e) => setInvestPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          style={{ width: '100%', padding: '6px 4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-primary)', fontSize: '12px', textAlign: 'center', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)', marginBottom: '2px' }}>Charity %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={charityPct}
+                          onChange={(e) => setCharityPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          style={{ width: '100%', padding: '6px 4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-primary)', fontSize: '12px', textAlign: 'center', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)', marginBottom: '2px' }}>Expense %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={expensePct}
+                          onChange={(e) => setExpensePct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          style={{ width: '100%', padding: '6px 4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--color-text-primary)', fontSize: '12px', textAlign: 'center', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

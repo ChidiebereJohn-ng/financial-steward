@@ -262,6 +262,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
     .prepare(
       `SELECT date, net_worth, total_assets, total_liabilities 
        FROM net_worth_snapshots 
+       WHERE id IN (SELECT MAX(id) FROM net_worth_snapshots GROUP BY date)
        ORDER BY date ASC LIMIT 365`
     )
     .all<{ date: string; net_worth: number; total_assets: number; total_liabilities: number }>();

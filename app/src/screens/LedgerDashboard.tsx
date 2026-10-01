@@ -6,6 +6,7 @@ import { ReconcileModal } from '../components/ReconcileModal';
 import { ImportModal } from '../components/ImportModal';
 import { AddTransactionModal } from '../components/AddTransactionModal';
 import { TransferModal } from '../components/TransferModal';
+import { TransactionDetailModal } from '../components/TransactionDetailModal';
 import type { LedgerDashboardData } from '../../../worker/types';
 
 export const LedgerDashboard: React.FC = () => {
@@ -15,6 +16,7 @@ export const LedgerDashboard: React.FC = () => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showReconcileModal, setShowReconcileModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -592,13 +594,35 @@ export const LedgerDashboard: React.FC = () => {
         ) : (
           <div className="transaction-list">
             {displayedTransactions.map((tx) => (
-              <div key={tx.id} className="tx-row">
+              <div
+                key={tx.id}
+                className="tx-row"
+                onClick={() => setSelectedTxId(tx.id)}
+                style={{ cursor: 'pointer' }}
+                title="Click to view details, audit trail, or reverse"
+              >
                 <div className="tx-left">
                   <div className={`tx-circle ${tx.direction}`}>
                     {tx.direction === 'inflow' ? '↓' : '↑'}
                   </div>
                   <div className="tx-details">
-                    <h4>{tx.note || tx.purpose_label || tx.category_name || 'Transaction'}</h4>
+                    <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{tx.note || tx.purpose_label || tx.category_name || 'Transaction'}</span>
+                      {tx.note?.includes('[DELETED]') && (
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                            color: 'var(--color-negative)',
+                            fontWeight: 700,
+                          }}
+                        >
+                          REVERSED
+                        </span>
+                      )}
+                    </h4>
                     <p>
                       {tx.category_name || (tx.direction === 'inflow' ? 'Income Allocation' : 'Expense')} • {tx.date}
                       {tx.purpose_label && ` • Purpose: ${tx.purpose_label}`}
@@ -613,12 +637,25 @@ export const LedgerDashboard: React.FC = () => {
                   <div className={`tx-amount ${tx.direction}`}>
                     {tx.direction === 'inflow' ? '+' : '-'}{formatNgn(tx.amount)}
                   </div>
+                  <span style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>›</span>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Transaction Detail & Reversal Modal */}
+      <TransactionDetailModal
+        isOpen={selectedTxId !== null}
+        transactionId={selectedTxId}
+        onClose={() => setSelectedTxId(null)}
+        onSuccess={() => {
+          fetchLedgerData();
+          setFeedback({ type: 'success', text: 'Transaction successfully reversed and ledger updated!' });
+          setTimeout(() => setFeedback(null), 4000);
+        }}
+      />
 
       {/* Add Transaction Modal */}
       <AddTransactionModal

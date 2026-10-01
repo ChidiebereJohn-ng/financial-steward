@@ -619,8 +619,15 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 12px 10px;
   border-bottom: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.tx-row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
 }
 
 .tx-row:last-child {

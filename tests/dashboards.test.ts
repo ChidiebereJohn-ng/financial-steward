@@ -170,7 +170,7 @@ describe('Module 3: Two Dashboards (Financial Health vs. Money Movement)', () =>
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
           body: JSON.stringify({
-            date: '2026-09-20',
+            date: new Date().toISOString().split('T')[0],
             direction: 'inflow',
             amount: 500000,
             note: 'Tech Consulting retainer',

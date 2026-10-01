@@ -8,11 +8,12 @@ import { LiabilitiesScreen } from './screens/LiabilitiesScreen';
 import { InvestorScreen } from './screens/InvestorScreen';
 import { PurchaseCalculatorScreen } from './screens/PurchaseCalculatorScreen';
 import { DigestScreen } from './screens/DigestScreen';
+import { RecurringScreen } from './screens/RecurringScreen';
 import { CsvExportCard } from './components/CsvExportCard';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('health');
-  const [budgetSubTab, setBudgetSubTab] = useState<'budgets' | 'goals'>('budgets');
+  const [budgetSubTab, setBudgetSubTab] = useState<'budgets' | 'goals' | 'recurring' | 'liabilities'>('budgets');
   const [moreSubTab, setMoreSubTab] = useState<'calculator' | 'digest' | 'liabilities' | 'export'>('calculator');
 
   return (
@@ -25,8 +26,8 @@ export const App: React.FC = () => {
         {activeTab === 'investor' && <InvestorScreen />}
         {activeTab === 'budgets' && (
           <div>
-            {/* Sub-tab switcher between Budgets and Goals */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+            {/* Sub-tab switcher between Budgets, Goals, Recurring & Liabilities */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setBudgetSubTab('budgets')}
                 style={{
@@ -39,7 +40,7 @@ export const App: React.FC = () => {
                   border: `1px solid ${budgetSubTab === 'budgets' ? 'var(--color-primary)' : 'var(--border-color)'}`,
                 }}
               >
-                Monthly Budgets (Screen 5)
+                Monthly Budgets
               </button>
               <button
                 onClick={() => setBudgetSubTab('goals')}
@@ -53,11 +54,42 @@ export const App: React.FC = () => {
                   border: `1px solid ${budgetSubTab === 'goals' ? 'var(--color-primary)' : 'var(--border-color)'}`,
                 }}
               >
-                Financial Goals (Screen 6)
+                Financial Goals
+              </button>
+              <button
+                onClick={() => setBudgetSubTab('recurring')}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  backgroundColor: budgetSubTab === 'recurring' ? 'var(--color-primary)' : 'var(--bg-card)',
+                  color: budgetSubTab === 'recurring' ? '#ffffff' : 'var(--color-text-secondary)',
+                  border: `1px solid ${budgetSubTab === 'recurring' ? 'var(--color-primary)' : 'var(--border-color)'}`,
+                }}
+              >
+                Recurring Commitments
+              </button>
+              <button
+                onClick={() => setBudgetSubTab('liabilities')}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  backgroundColor: budgetSubTab === 'liabilities' ? 'var(--color-primary)' : 'var(--bg-card)',
+                  color: budgetSubTab === 'liabilities' ? '#ffffff' : 'var(--color-text-secondary)',
+                  border: `1px solid ${budgetSubTab === 'liabilities' ? 'var(--color-primary)' : 'var(--border-color)'}`,
+                }}
+              >
+                Liabilities & Debt
               </button>
             </div>
 
-            {budgetSubTab === 'budgets' ? <BudgetsScreen /> : <GoalsScreen />}
+            {budgetSubTab === 'budgets' && <BudgetsScreen />}
+            {budgetSubTab === 'goals' && <GoalsScreen />}
+            {budgetSubTab === 'recurring' && <RecurringScreen />}
+            {budgetSubTab === 'liabilities' && <LiabilitiesScreen />}
           </div>
         )}
         {activeTab === 'more' && (
