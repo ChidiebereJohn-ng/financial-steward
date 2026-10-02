@@ -463,7 +463,7 @@ export async function processWealthVaultImport(
         const txId = txInsert.meta.last_row_id as number;
         importedTransactionIds.push(txId);
 
-        // Reconstruct allocation_runs and bucket_ledger_entries (allocation_credit)
+        // Reconstruct allocation_runs and bucket_ledger_entries (allocation_credit) via db.batch
         const bucketKeys: (keyof typeof splits)[] = [
           'tithe',
           'kingdom',
@@ -473,34 +473,39 @@ export async function processWealthVaultImport(
           'expense',
         ];
 
+        const batchStmts: any[] = [];
         for (const bKey of bucketKeys) {
           const bId = bucketMap[bKey];
           const splitAmt = splits[bKey];
 
           // 1. Allocation run
-          await db
-            .prepare(
-              'INSERT INTO allocation_runs (transaction_id, bucket_id, amount) VALUES (?, ?, ?)'
-            )
-            .bind(txId, bId, splitAmt)
-            .run();
+          batchStmts.push(
+            db
+              .prepare(
+                'INSERT INTO allocation_runs (transaction_id, bucket_id, amount) VALUES (?, ?, ?)'
+              )
+              .bind(txId, bId, splitAmt)
+          );
 
           // 2. Bucket ledger credit
-          await db
-            .prepare(
-              `INSERT INTO bucket_ledger_entries (
-                bucket_id, transaction_id, entry_type, amount, date, note
-              ) VALUES (?, ?, 'allocation_credit', ?, ?, ?)`
-            )
-            .bind(
-              bId,
-              txId,
-              splitAmt,
-              dateStr,
-              row.note ? `${row.note} (${bKey})` : `Historical inflow allocation (${bKey})`
-            )
-            .run();
+          batchStmts.push(
+            db
+              .prepare(
+                `INSERT INTO bucket_ledger_entries (
+                  bucket_id, transaction_id, entry_type, amount, date, note
+                ) VALUES (?, ?, 'allocation_credit', ?, ?, ?)`
+              )
+              .bind(
+                bId,
+                txId,
+                splitAmt,
+                dateStr,
+                row.note ? `${row.note} (${bKey})` : `Historical inflow allocation (${bKey})`
+              )
+          );
         }
+
+        await db.batch(batchStmts);
 
         importedCount++;
       } else {

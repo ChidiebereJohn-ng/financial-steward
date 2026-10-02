@@ -55,46 +55,61 @@ export async function validateImportReconciliation(
   }
 
   // 4. Compute source totals from allocation_runs and transactions for these batch transactions
-  // Inflows: allocation_runs amounts
-  const placeholders = importedTransactionIds.map(() => '?').join(',');
-  const { results: allocationRunSums } = await db
-    .prepare(
-      `SELECT bucket_id, COALESCE(SUM(amount), 0) as total
-       FROM allocation_runs
-       WHERE transaction_id IN (${placeholders})
-       GROUP BY bucket_id`
-    )
-    .bind(...importedTransactionIds)
-    .all<{ bucket_id: number; total: number }>();
-
+  // Inflows: allocation_runs amounts (chunked to prevent SQLite parameter limits)
+  const CHUNK_SIZE = 50;
   const sourceInflowMap = new Map<number, number>();
-  for (const row of allocationRunSums) {
-    sourceInflowMap.set(row.bucket_id, Math.round(row.total * 100) / 100);
+  for (let i = 0; i < importedTransactionIds.length; i += CHUNK_SIZE) {
+    const chunk = importedTransactionIds.slice(i, i + CHUNK_SIZE);
+    const placeholders = chunk.map(() => '?').join(',');
+    const { results: allocationRunSums } = await db
+      .prepare(
+        `SELECT bucket_id, COALESCE(SUM(amount), 0) as total
+         FROM allocation_runs
+         WHERE transaction_id IN (${placeholders})
+         GROUP BY bucket_id`
+      )
+      .bind(...chunk)
+      .all<{ bucket_id: number; total: number }>();
+
+    for (const row of allocationRunSums) {
+      sourceInflowMap.set(row.bucket_id, (sourceInflowMap.get(row.bucket_id) || 0) + row.total);
+    }
   }
 
   // 5. Compute actual batch ledger totals from bucket_ledger_entries for these transactions
-  const { results: ledgerSums } = await db
-    .prepare(
-      `SELECT 
-        bucket_id,
-        COALESCE(SUM(
-          CASE 
-            WHEN entry_type IN ('allocation_credit', 'transfer_in') THEN amount
-            WHEN entry_type IN ('expense_debit', 'transfer_out') THEN -amount
-            WHEN entry_type = 'manual_adjustment' THEN amount
-            ELSE 0
-          END
-        ), 0) as net_ledger
-       FROM bucket_ledger_entries
-       WHERE transaction_id IN (${placeholders})
-       GROUP BY bucket_id`
-    )
-    .bind(...importedTransactionIds)
-    .all<{ bucket_id: number; net_ledger: number }>();
-
   const batchLedgerMap = new Map<number, number>();
-  for (const row of ledgerSums) {
-    batchLedgerMap.set(row.bucket_id, Math.round(row.net_ledger * 100) / 100);
+  for (let i = 0; i < importedTransactionIds.length; i += CHUNK_SIZE) {
+    const chunk = importedTransactionIds.slice(i, i + CHUNK_SIZE);
+    const placeholders = chunk.map(() => '?').join(',');
+    const { results: ledgerSums } = await db
+      .prepare(
+        `SELECT 
+          bucket_id,
+          COALESCE(SUM(
+            CASE 
+              WHEN entry_type IN ('allocation_credit', 'transfer_in') THEN amount
+              WHEN entry_type IN ('expense_debit', 'transfer_out') THEN -amount
+              WHEN entry_type = 'manual_adjustment' THEN amount
+              ELSE 0
+            END
+          ), 0) as net_ledger
+         FROM bucket_ledger_entries
+         WHERE transaction_id IN (${placeholders})
+         GROUP BY bucket_id`
+      )
+      .bind(...chunk)
+      .all<{ bucket_id: number; net_ledger: number }>();
+
+    for (const row of ledgerSums) {
+      batchLedgerMap.set(row.bucket_id, (batchLedgerMap.get(row.bucket_id) || 0) + row.net_ledger);
+    }
+  }
+
+  for (const [k, v] of sourceInflowMap.entries()) {
+    sourceInflowMap.set(k, Math.round(v * 100) / 100);
+  }
+  for (const [k, v] of batchLedgerMap.entries()) {
+    batchLedgerMap.set(k, Math.round(v * 100) / 100);
   }
 
   // 6. Build per-bucket reconciliation items

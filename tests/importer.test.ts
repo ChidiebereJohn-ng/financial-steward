@@ -536,10 +536,43 @@ describe('Module 8: WealthVault Data Migration Engine & Reconciliation', () => {
 
       expect(res.status).toBe(200);
       const data = await res.json<any>();
-      expect(data.reconciliation).toBeDefined();
       expect(data.reconciliation.reconciled).toBe(true);
       expect(data.reconciliation.total_variance).toBe(0);
       expect(data.reconciliation.buckets.length).toBe(6);
+    });
+
+    it('should successfully import > 120 rows and reconcile without SQLite variable limit errors', async () => {
+      // Generate 130 inflow rows to exceed standard SQLite 100-variable parameter thresholds
+      const rows = [];
+      for (let i = 1; i <= 130; i++) {
+        rows.push({
+          external_id: `LARGE_BATCH_TX_${i}`,
+          date: '2026-03-01',
+          direction: 'inflow' as const,
+          subtype: null,
+          amount: 1000,
+          currency: 'NGN',
+          category: 'Salary',
+          note: `Batch Item ${i}`,
+          purpose_label: null,
+          bucket: null,
+          from_bucket: null,
+          to_bucket: null,
+          split_tithe: null,
+          split_kingdom: null,
+          split_savings: null,
+          split_invest: null,
+          split_charity: null,
+          split_expense: null,
+          is_override: false,
+        });
+      }
+
+      const res = await processWealthVaultImport(mockEnv.DB, 'large_scale_test.csv', rows);
+      expect(res.status).toBe('completed');
+      expect(res.imported_count).toBe(130);
+      expect(res.reconciliation.reconciled).toBe(true);
+      expect(res.reconciliation.total_variance).toBe(0);
     });
   });
 });
