@@ -133,7 +133,7 @@ analyticsApp.get('/breakdown', async (c) => {
   const netDelta = Math.round((totalInflow - totalOutflow) * 100) / 100;
   const transactionCount = summaryRaw?.transaction_count || 0;
 
-  // 2. Savings & Investment Allocated in Period (from allocation_runs)
+  // 2. Savings & Investment: Gross Waterfall Allocated vs. Inter-Bucket Net Retained
   const savingsInvestRaw = await c.env.DB
     .prepare(
       `SELECT COALESCE(SUM(ar.amount), 0) as saved 
@@ -148,7 +148,45 @@ analyticsApp.get('/breakdown', async (c) => {
     .first<{ saved: number }>();
 
   const savingsInvestAllocated = Math.round((savingsInvestRaw?.saved || 0) * 100) / 100;
-  const savingsRate = totalInflow > 0 ? Math.round((savingsInvestAllocated / totalInflow) * 1000) / 10 : 0;
+
+  // Inter-bucket transfers on savings & invest buckets in this period
+  const btDateClause = view === 'day' ? 'bt.date = ?' : view === 'year' ? "strftime('%Y', bt.date) = ?" : "strftime('%Y-%m', bt.date) = ?";
+
+  const savingsInvestTransfersRaw = await c.env.DB
+    .prepare(
+      `SELECT 
+         COALESCE(SUM(CASE WHEN tb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_in,
+         COALESCE(SUM(CASE WHEN fb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_out
+       FROM bucket_transfers bt
+       JOIN allocation_buckets fb ON bt.from_bucket_id = fb.id
+       JOIN allocation_buckets tb ON bt.to_bucket_id = tb.id
+       WHERE ${btDateClause}`
+    )
+    .bind(periodParam)
+    .first<{ transfer_in: number; transfer_out: number }>();
+
+  // Any direct expense debits on savings/invest buckets
+  const bleDateClause = view === 'day' ? 'ble.date = ?' : view === 'year' ? "strftime('%Y', ble.date) = ?" : "strftime('%Y-%m', ble.date) = ?";
+
+  const directDebitsRaw = await c.env.DB
+    .prepare(
+      `SELECT COALESCE(SUM(ble.amount), 0) as debits
+       FROM bucket_ledger_entries ble
+       JOIN allocation_buckets b ON ble.bucket_id = b.id
+       WHERE b.key IN ('savings', 'invest')
+         AND ble.entry_type = 'expense_debit'
+         AND ${bleDateClause}`
+    )
+    .bind(periodParam)
+    .first<{ debits: number }>();
+
+  const transferIn = Math.round((savingsInvestTransfersRaw?.transfer_in || 0) * 100) / 100;
+  const transferOut = Math.round((savingsInvestTransfersRaw?.transfer_out || 0) * 100) / 100;
+  const directDebits = Math.round((directDebitsRaw?.debits || 0) * 100) / 100;
+  const savingsInvestNetRetained = Math.max(0, Math.round((savingsInvestAllocated + transferIn - transferOut - directDebits) * 100) / 100);
+
+  const savingsGrossRate = totalInflow > 0 ? Math.round((savingsInvestAllocated / totalInflow) * 1000) / 10 : 0;
+  const savingsNetRate = totalInflow > 0 ? Math.round((savingsInvestNetRetained / totalInflow) * 1000) / 10 : 0;
 
   // 3. Time Series Chart Data
   let timeSeries: Array<{ key: string; label: string; inflow: number; outflow: number; net: number }> = [];
@@ -405,7 +443,7 @@ analyticsApp.get('/breakdown', async (c) => {
     };
   });
 
-  // 7. Full Chronological Activity Feed for the Period
+  // 7. Full Chronological Activity Feed for the Period (Transactions + Bucket Transfers)
   const { results: allTxs } = await c.env.DB
     .prepare(
       `SELECT 
@@ -431,6 +469,55 @@ analyticsApp.get('/breakdown', async (c) => {
     .bind(periodParam)
     .all<any>();
 
+  // Fetch bucket transfers occurring in this period
+  const { results: rawTransfers } = await c.env.DB
+    .prepare(
+      `SELECT 
+         bt.id,
+         bt.date,
+         bt.amount,
+         bt.reason,
+         fb.id as from_bucket_id,
+         fb.name as from_bucket_name,
+         fb.key as from_bucket_key,
+         tb.id as to_bucket_id,
+         tb.name as to_bucket_name,
+         tb.key as to_bucket_key
+       FROM bucket_transfers bt
+       JOIN allocation_buckets fb ON bt.from_bucket_id = fb.id
+       JOIN allocation_buckets tb ON bt.to_bucket_id = tb.id
+       WHERE ${btDateClause}
+       ORDER BY bt.date DESC, bt.id DESC`
+    )
+    .bind(periodParam)
+    .all<any>();
+
+  const formattedTransfers = (rawTransfers || []).map((bt: any) => ({
+    id: `transfer-${bt.id}`,
+    date: bt.date,
+    direction: 'transfer',
+    subtype: 'bucket_transfer',
+    amount: bt.amount,
+    currency: 'NGN',
+    category_name: `${bt.from_bucket_name} → ${bt.to_bucket_name}`,
+    income_source_name: null,
+    account_name: 'Bucket Transfer',
+    note: bt.reason || `Transfer from ${bt.from_bucket_name} to ${bt.to_bucket_name}`,
+    purpose_label: `${bt.from_bucket_name} → ${bt.to_bucket_name}`,
+    from_bucket_name: bt.from_bucket_name,
+    to_bucket_name: bt.to_bucket_name,
+    from_bucket_key: bt.from_bucket_key,
+    to_bucket_key: bt.to_bucket_key,
+  }));
+
+  const allActivity = [...(allTxs || []), ...formattedTransfers].sort((a: any, b: any) => {
+    const dateCmp = b.date.localeCompare(a.date);
+    if (dateCmp !== 0) return dateCmp;
+    const idA = typeof a.id === 'number' ? a.id : parseInt(String(a.id).replace(/\D/g, '') || '0', 10);
+    const idB = typeof b.id === 'number' ? b.id : parseInt(String(b.id).replace(/\D/g, '') || '0', 10);
+    return idB - idA;
+  });
+
   return c.json({
     period: {
       view,
@@ -444,13 +531,20 @@ analyticsApp.get('/breakdown', async (c) => {
       total_outflow: totalOutflow,
       net_delta: netDelta,
       savings_invest_allocated: savingsInvestAllocated,
-      savings_invest_rate: savingsRate,
+      savings_invest_gross_rate: savingsGrossRate,
+      savings_invest_net: savingsInvestNetRetained,
+      savings_invest_transfers: Math.round((transferIn - transferOut) * 100) / 100,
+      savings_invest_transfers_out: transferOut,
+      savings_invest_transfers_in: transferIn,
+      savings_invest_rate: savingsNetRate,
       transaction_count: transactionCount,
+      transfer_count: rawTransfers?.length || 0,
     },
     time_series: timeSeries,
     expenses_by_category: expensesByCategory,
     inflows_by_source: inflowsBySource,
-    all_transactions: allTxs,
+    bucket_transfers: rawTransfers || [],
+    all_transactions: allActivity,
   });
 });
 

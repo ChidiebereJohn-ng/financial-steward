@@ -19,8 +19,14 @@ interface BreakdownData {
     total_outflow: number;
     net_delta: number;
     savings_invest_allocated: number;
+    savings_invest_gross_rate?: number;
+    savings_invest_net?: number;
+    savings_invest_transfers?: number;
+    savings_invest_transfers_out?: number;
+    savings_invest_transfers_in?: number;
     savings_invest_rate: number;
     transaction_count: number;
+    transfer_count?: number;
   };
   time_series: Array<{
     key: string;
@@ -60,10 +66,22 @@ interface BreakdownData {
       account_name: string | null;
     }>;
   }>;
-  all_transactions: Array<{
+  bucket_transfers?: Array<{
     id: number;
     date: string;
-    direction: 'inflow' | 'outflow';
+    amount: number;
+    reason: string | null;
+    from_bucket_id: number;
+    from_bucket_name: string;
+    from_bucket_key: string;
+    to_bucket_id: number;
+    to_bucket_name: string;
+    to_bucket_key: string;
+  }>;
+  all_transactions: Array<{
+    id: number | string;
+    date: string;
+    direction: 'inflow' | 'outflow' | 'transfer';
     subtype: string | null;
     amount: number;
     currency: string;
@@ -71,6 +89,11 @@ interface BreakdownData {
     income_source_name: string | null;
     account_name: string | null;
     note: string | null;
+    purpose_label?: string | null;
+    from_bucket_name?: string;
+    to_bucket_name?: string;
+    from_bucket_key?: string;
+    to_bucket_key?: string;
   }>;
 }
 
@@ -94,7 +117,7 @@ export const AnalyticsScreen: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [directionFilter, setDirectionFilter] = useState<'all' | 'inflow' | 'outflow'>('all');
+  const [directionFilter, setDirectionFilter] = useState<'all' | 'inflow' | 'outflow' | 'transfer'>('all');
   const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
 
   // Load available historical periods (distinct years/months with transactions)
@@ -471,6 +494,7 @@ export const AnalyticsScreen: React.FC = () => {
           label="Total Inflows"
           value={formatNgn(data?.summary.total_inflow || 0)}
           subtext="Gross receipts in period"
+          icon="↓"
           tone="positive"
         />
 
@@ -478,6 +502,7 @@ export const AnalyticsScreen: React.FC = () => {
           label="Total Expenses"
           value={formatNgn(data?.summary.total_outflow || 0)}
           subtext="Categorized outflows in period"
+          icon="↑"
           tone="negative"
         />
 
@@ -485,14 +510,20 @@ export const AnalyticsScreen: React.FC = () => {
           label="Net Operating Delta"
           value={(data?.summary.net_delta || 0) >= 0 ? `+${formatNgn(data?.summary.net_delta || 0)}` : `-${formatNgn(Math.abs(data?.summary.net_delta || 0))}`}
           subtext={(data?.summary.net_delta || 0) >= 0 ? 'Surplus cash retained' : 'Deficit / Net draw'}
+          icon="⚖️"
           tone={(data?.summary.net_delta || 0) >= 0 ? 'positive' : 'negative'}
         />
 
         <KpiCard
-          label="Savings & Investment"
-          value={formatNgn(data?.summary.savings_invest_allocated || 0)}
-          subtext={`${data?.summary.savings_invest_rate || 0}% stewardship allocation`}
-          tone="neutral"
+          label={(data?.summary.savings_invest_transfers_out || 0) > 0 ? 'Savings & Invest (Retained)' : 'Savings & Investment'}
+          value={formatNgn(data?.summary.savings_invest_net ?? data?.summary.savings_invest_allocated ?? 0)}
+          subtext={
+            (data?.summary.savings_invest_transfers_out || 0) > 0
+              ? `${data?.summary.savings_invest_rate || 0}% retained (${formatNgn(data?.summary.savings_invest_allocated || 0)} gross · -${formatNgn(data?.summary.savings_invest_transfers_out || 0)} reallocated)`
+              : `${data?.summary.savings_invest_rate || 0}% stewardship allocation`
+          }
+          icon="🌱"
+          tone={(data?.summary.savings_invest_transfers_out || 0) > 0 && (data?.summary.savings_invest_net || 0) === 0 ? 'negative' : 'neutral'}
         />
       </div>
 
@@ -774,7 +805,79 @@ export const AnalyticsScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 6. Period Transaction Ledger & Search */}
+      {/* 6. Inter-Bucket Fund Transfers Section */}
+      {data?.bucket_transfers && data.bucket_transfers.length > 0 && (
+        <div style={{
+          backgroundColor: 'var(--bg-card, #FFFFFF)',
+          borderRadius: 'var(--radius-md, 12px)',
+          border: '1px solid var(--border-color, #E2E8F0)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary, #0F172A)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⇄</span> Inter-Bucket Fund Transfers ({data.bucket_transfers.length})
+              </h2>
+              <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0 0' }}>
+                Internal capital reallocations executed in {data?.period.label} to address bucket deficits
+              </p>
+            </div>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              backgroundColor: '#EFF6FF',
+              color: '#1D4ED8',
+              padding: '4px 10px',
+              borderRadius: '6px',
+            }}>
+              Net Reallocated: {formatNgn(Math.abs(data.summary.savings_invest_transfers || 0))}
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+            {data.bucket_transfers.map((bt) => (
+              <div
+                key={bt.id}
+                style={{
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  backgroundColor: '#F8FAFC',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>
+                    <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#E2E8F0', fontSize: '11px' }}>
+                      {bt.from_bucket_name}
+                    </span>
+                    <span>→</span>
+                    <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#DBEAFE', color: '#1E40AF', fontSize: '11px' }}>
+                      {bt.to_bucket_name}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#2563EB' }}>
+                    ⇄ {formatNgn(bt.amount)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748B' }}>
+                  <span>{bt.date}</span>
+                  <span style={{ fontStyle: 'italic', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {bt.reason || 'Inter-bucket rebalance'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 7. Period Transaction Ledger & Search */}
       <div style={{
         backgroundColor: 'var(--bg-card, #FFFFFF)',
         borderRadius: 'var(--radius-md, 12px)',
@@ -825,6 +928,7 @@ export const AnalyticsScreen: React.FC = () => {
               <option value="all">All Movements</option>
               <option value="inflow">Inflows Only</option>
               <option value="outflow">Expenses Only</option>
+              <option value="transfer">⇄ Bucket Transfers Only</option>
             </select>
           </div>
         </div>
@@ -853,10 +957,10 @@ export const AnalyticsScreen: React.FC = () => {
                 filteredTransactions.map((tx) => (
                   <tr
                     key={tx.id}
-                    onClick={() => setSelectedTxId(tx.id)}
+                    onClick={() => typeof tx.id === 'number' && setSelectedTxId(tx.id)}
                     style={{
                       borderBottom: '1px solid #F1F5F9',
-                      cursor: 'pointer',
+                      cursor: typeof tx.id === 'number' ? 'pointer' : 'default',
                       transition: 'background-color 0.1s ease',
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
@@ -866,24 +970,62 @@ export const AnalyticsScreen: React.FC = () => {
                       {tx.date}
                     </td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          backgroundColor: tx.direction === 'inflow' ? '#DCFCE7' : '#FEE2E2',
-                          color: tx.direction === 'inflow' ? '#16A34A' : '#DC2626',
-                        }}
-                      >
-                        {tx.direction === 'inflow' ? '↓ Inflow' : '↑ Expense'}
-                      </span>
+                      {tx.direction === 'inflow' ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            backgroundColor: '#DCFCE7',
+                            color: '#16A34A',
+                          }}
+                        >
+                          ↓ Inflow
+                        </span>
+                      ) : tx.direction === 'transfer' ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            backgroundColor: '#DBEAFE',
+                            color: '#1D4ED8',
+                          }}
+                        >
+                          ⇄ Transfer
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            backgroundColor: '#FEE2E2',
+                            color: '#DC2626',
+                          }}
+                        >
+                          ↑ Expense
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0F172A' }}>
-                      {tx.direction === 'inflow' ? tx.income_source_name || tx.category_name || 'Income' : tx.category_name || 'Expense'}
+                      {tx.direction === 'inflow'
+                        ? tx.income_source_name || tx.category_name || 'Income'
+                        : tx.direction === 'transfer'
+                        ? <span style={{ color: '#1D4ED8' }}>{tx.category_name}</span>
+                        : tx.category_name || 'Expense'}
                     </td>
                     <td style={{ padding: '10px 12px', color: '#64748B' }}>
                       {tx.account_name || '—'}
@@ -891,8 +1033,18 @@ export const AnalyticsScreen: React.FC = () => {
                     <td style={{ padding: '10px 12px', color: '#475569', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {tx.note || tx.purpose_label || '—'}
                     </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: tx.direction === 'inflow' ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }}>
-                      {tx.direction === 'inflow' ? `+${formatNgn(tx.amount)}` : `-${formatNgn(tx.amount)}`}
+                    <td style={{
+                      padding: '10px 12px',
+                      textAlign: 'right',
+                      fontWeight: 700,
+                      color: tx.direction === 'inflow' ? '#16A34A' : tx.direction === 'transfer' ? '#2563EB' : '#DC2626',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {tx.direction === 'inflow'
+                        ? `+${formatNgn(tx.amount)}`
+                        : tx.direction === 'transfer'
+                        ? `⇄ ${formatNgn(tx.amount)}`
+                        : `-${formatNgn(tx.amount)}`}
                     </td>
                   </tr>
                 ))

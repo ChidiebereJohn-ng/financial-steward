@@ -274,7 +274,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
     .bind(currentMonth)
     .first<{ gross: number }>();
 
-  // Savings & Invest allocations this month
+  // Savings & Invest allocations this month (Gross waterfall allocation)
   const thisMonthSavingsInvest = await db
     .prepare(
       `SELECT COALESCE(SUM(ar.amount), 0) as saved 
@@ -288,9 +288,42 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
     .bind(currentMonth)
     .first<{ saved: number }>();
 
+  // Savings & Invest Transfers this month
+  const thisMonthTransfers = await db
+    .prepare(
+      `SELECT 
+         COALESCE(SUM(CASE WHEN tb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_in,
+         COALESCE(SUM(CASE WHEN fb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_out
+       FROM bucket_transfers bt
+       JOIN allocation_buckets fb ON bt.from_bucket_id = fb.id
+       JOIN allocation_buckets tb ON bt.to_bucket_id = tb.id
+       WHERE strftime('%Y-%m', bt.date) = ?`
+    )
+    .bind(currentMonth)
+    .first<{ transfer_in: number; transfer_out: number }>();
+
+  // Any direct expense debits on savings/invest buckets
+  const thisMonthDirectDebits = await db
+    .prepare(
+      `SELECT COALESCE(SUM(ble.amount), 0) as debits
+       FROM bucket_ledger_entries ble
+       JOIN allocation_buckets b ON ble.bucket_id = b.id
+       WHERE b.key IN ('savings', 'invest')
+         AND ble.entry_type = 'expense_debit'
+         AND strftime('%Y-%m', ble.date) = ?`
+    )
+    .bind(currentMonth)
+    .first<{ debits: number }>();
+
   const grossVal = thisMonthGross?.gross || 0;
-  const savedVal = thisMonthSavingsInvest?.saved || 0;
-  const thisMonthRate = grossVal > 0 ? Math.round((savedVal / grossVal) * 1000) / 10 : 0;
+  const grossSavedVal = thisMonthSavingsInvest?.saved || 0;
+  const transferInVal = thisMonthTransfers?.transfer_in || 0;
+  const transferOutVal = thisMonthTransfers?.transfer_out || 0;
+  const directDebitsVal = thisMonthDirectDebits?.debits || 0;
+  const netSavedVal = Math.max(0, grossSavedVal + transferInVal - transferOutVal - directDebitsVal);
+
+  const thisMonthRate = grossVal > 0 ? Math.round((netSavedVal / grossVal) * 1000) / 10 : 0;
+  const thisMonthGrossRate = grossVal > 0 ? Math.round((grossSavedVal / grossVal) * 1000) / 10 : 0;
 
   // Last month rate
   const lastMonthGross = await db
@@ -317,9 +350,39 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
     .bind(priorMonth)
     .first<{ saved: number }>();
 
+  const lastMonthTransfers = await db
+    .prepare(
+      `SELECT 
+         COALESCE(SUM(CASE WHEN tb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_in,
+         COALESCE(SUM(CASE WHEN fb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_out
+       FROM bucket_transfers bt
+       JOIN allocation_buckets fb ON bt.from_bucket_id = fb.id
+       JOIN allocation_buckets tb ON bt.to_bucket_id = tb.id
+       WHERE strftime('%Y-%m', bt.date) = ?`
+    )
+    .bind(priorMonth)
+    .first<{ transfer_in: number; transfer_out: number }>();
+
+  const lastMonthDirectDebits = await db
+    .prepare(
+      `SELECT COALESCE(SUM(ble.amount), 0) as debits
+       FROM bucket_ledger_entries ble
+       JOIN allocation_buckets b ON ble.bucket_id = b.id
+       WHERE b.key IN ('savings', 'invest')
+         AND ble.entry_type = 'expense_debit'
+         AND strftime('%Y-%m', ble.date) = ?`
+    )
+    .bind(priorMonth)
+    .first<{ debits: number }>();
+
   const lastGrossVal = lastMonthGross?.gross || 0;
-  const lastSavedVal = lastMonthSavingsInvest?.saved || 0;
-  const lastMonthRate = lastGrossVal > 0 ? Math.round((lastSavedVal / lastGrossVal) * 1000) / 10 : 0;
+  const lastGrossSavedVal = lastMonthSavingsInvest?.saved || 0;
+  const lastTransferInVal = lastMonthTransfers?.transfer_in || 0;
+  const lastTransferOutVal = lastMonthTransfers?.transfer_out || 0;
+  const lastDirectDebitsVal = lastMonthDirectDebits?.debits || 0;
+  const lastNetSavedVal = Math.max(0, lastGrossSavedVal + lastTransferInVal - lastTransferOutVal - lastDirectDebitsVal);
+
+  const lastMonthRate = lastGrossVal > 0 ? Math.round((lastNetSavedVal / lastGrossVal) * 1000) / 10 : 0;
   const rateChange = Math.round((thisMonthRate - lastMonthRate) * 10) / 10;
 
   // 3. Allocation Waterfall for Current Month
@@ -473,6 +536,11 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
       this_month_pct: thisMonthRate,
       last_month_pct: lastMonthRate,
       change_pct: rateChange,
+      gross_allocated: grossSavedVal,
+      net_retained: netSavedVal,
+      transfers_out: transferOutVal,
+      transfers_in: transferInVal,
+      gross_rate_pct: thisMonthGrossRate,
     },
     allocation_waterfall: {
       month: currentMonth,

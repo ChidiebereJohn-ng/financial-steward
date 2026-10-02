@@ -176,6 +176,11 @@ export interface HealthDashboardData {
     this_month_pct: number;
     last_month_pct: number;
     change_pct: number;
+    gross_allocated?: number;
+    net_retained?: number;
+    transfers_out?: number;
+    transfers_in?: number;
+    gross_rate_pct?: number;
   };
   allocation_waterfall: {
     month: string;

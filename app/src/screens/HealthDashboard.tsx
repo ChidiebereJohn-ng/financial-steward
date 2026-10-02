@@ -189,16 +189,32 @@ export const HealthDashboard: React.FC = () => {
         />
 
         <KpiCard
-          label="Savings & Investment Rate"
+          label={
+            data.savings_invest_rate.transfers_out && data.savings_invest_rate.transfers_out > 0
+              ? 'Savings & Invest Rate (Retained)'
+              : 'Savings & Investment Rate'
+          }
           value={`${data.savings_invest_rate.this_month_pct}%`}
           icon="↗"
-          iconBg="rgba(22, 163, 74, 0.08)"
-          iconColor="var(--color-positive)"
+          iconBg={
+            data.savings_invest_rate.transfers_out && data.savings_invest_rate.transfers_out > 0 && data.savings_invest_rate.this_month_pct === 0
+              ? 'rgba(239, 68, 68, 0.08)'
+              : 'rgba(22, 163, 74, 0.08)'
+          }
+          iconColor={
+            data.savings_invest_rate.transfers_out && data.savings_invest_rate.transfers_out > 0 && data.savings_invest_rate.this_month_pct === 0
+              ? 'var(--color-negative)'
+              : 'var(--color-positive)'
+          }
           trend={{
             value: `${Math.abs(data.savings_invest_rate.change_pct)}% vs last month`,
             direction: data.savings_invest_rate.change_pct >= 0 ? 'up' : 'down',
           }}
-          subtext={`Prior Month: ${data.savings_invest_rate.last_month_pct}%`}
+          subtext={
+            data.savings_invest_rate.transfers_out && data.savings_invest_rate.transfers_out > 0
+              ? `Retained: ${formatNgn(data.savings_invest_rate.net_retained ?? 0)} (-${formatNgn(data.savings_invest_rate.transfers_out)} reallocated)`
+              : `Prior Month: ${data.savings_invest_rate.last_month_pct}%`
+          }
         />
 
         <KpiCard
@@ -263,12 +279,28 @@ export const HealthDashboard: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="insight-card success">
-              <h5 className="insight-title">Savings & Investment Discipline Active</h5>
-              <p className="insight-body">
-                Current month rate of {data.savings_invest_rate.this_month_pct}% fulfills the remainder base allocation ratio.
-              </p>
-            </div>
+            {data.savings_invest_rate.this_month_pct > 0 && (!data.savings_invest_rate.transfers_out || data.savings_invest_rate.transfers_out === 0) ? (
+              <div className="insight-card success">
+                <h5 className="insight-title">Savings & Investment Discipline Active</h5>
+                <p className="insight-body">
+                  Current month rate of {data.savings_invest_rate.this_month_pct}% fulfills the remainder base allocation ratio.
+                </p>
+              </div>
+            ) : data.savings_invest_rate.transfers_out && data.savings_invest_rate.transfers_out > 0 ? (
+              <div className="insight-card warning">
+                <h5 className="insight-title">Savings Reallocated to Cover Deficits</h5>
+                <p className="insight-body">
+                  {formatNgn(data.savings_invest_rate.transfers_out)} was transferred out of savings and investments to address expenses deficits. Current retained rate is {data.savings_invest_rate.this_month_pct}%.
+                </p>
+              </div>
+            ) : (
+              <div className="insight-card">
+                <h5 className="insight-title">Savings & Investment Tracking</h5>
+                <p className="insight-body">
+                  No retained savings or investment recorded for this period.
+                </p>
+              </div>
+            )}
 
             <div className="insight-card">
               <h5 className="insight-title">Expenses Runway Projection</h5>

@@ -235,4 +235,75 @@ describe('Analytics & Cash Flow Breakdown Endpoint Tests', () => {
     expect(json.summary.transaction_count).toBe(2);
     expect(json.all_transactions.length).toBe(2);
   });
+
+  it('should track Inter-Bucket Fund Transfers in Analytics and adjust Net Retained Savings', async () => {
+    // 1. Post an inflow transaction of 100,000 NGN in 2026-10 to generate allocation runs
+    const inflowRes = await app.request('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
+      body: JSON.stringify({
+        date: '2026-10-15',
+        direction: 'inflow',
+        amount: 100000,
+        currency: 'NGN',
+        account_id: 1,
+        note: 'Stewardship Inflow Test',
+      }),
+    }, mockEnv);
+    expect(inflowRes.status).toBe(201);
+
+    // 2. Execute Inter-Bucket Transfers from Savings (id=3) and Invest (id=4) to Expenses (id=6)
+    const transfer1 = await app.request('/api/buckets/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
+      body: JSON.stringify({
+        from_bucket_id: 3, // Savings
+        to_bucket_id: 6,   // Expenses
+        amount: 14000,
+        date: '2026-10-16',
+        reason: 'Covering expenses deficit from savings',
+      }),
+    }, mockEnv);
+    expect(transfer1.status).toBe(201);
+
+    const transfer2 = await app.request('/api/buckets/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
+      body: JSON.stringify({
+        from_bucket_id: 4, // Invest
+        to_bucket_id: 6,   // Expenses
+        amount: 14000,
+        date: '2026-10-16',
+        reason: 'Covering expenses deficit from investment',
+      }),
+    }, mockEnv);
+    expect(transfer2.status).toBe(201);
+
+    // 3. Query Analytics Breakdown for 2026-10
+    const analyticsRes = await app.request('/api/analytics/breakdown?month=2026-10', {
+      method: 'GET',
+      headers: { 'x-dev-bypass': 'true' },
+    }, mockEnv);
+    expect(analyticsRes.status).toBe(200);
+
+    const json = await analyticsRes.json<any>();
+    // Gross allocated was 14k (savings) + 14k (invest) = 28,000 NGN
+    expect(json.summary.savings_invest_allocated).toBe(28000);
+    // Transfers out = 28,000 NGN
+    expect(json.summary.savings_invest_transfers_out).toBe(28000);
+    expect(json.summary.savings_invest_transfers).toBe(-28000);
+    // Net retained in savings & invest is 0!
+    expect(json.summary.savings_invest_net).toBe(0);
+    expect(json.summary.savings_invest_rate).toBe(0);
+
+    // Bucket transfers list should contain the 2 transfers
+    expect(json.bucket_transfers.length).toBe(2);
+    expect(json.bucket_transfers[0].amount).toBe(14000);
+
+    // all_transactions should contain the bucket transfers merged in chronological sequence
+    const transferEntries = json.all_transactions.filter((tx: any) => tx.direction === 'transfer');
+    expect(transferEntries.length).toBe(2);
+    expect(transferEntries[0].subtype).toBe('bucket_transfer');
+    expect(transferEntries[0].category_name).toContain('→');
+  });
 });

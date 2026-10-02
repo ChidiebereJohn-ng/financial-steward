@@ -7,6 +7,7 @@ interface KpiCardProps {
   icon?: React.ReactNode;
   iconBg?: string;
   iconColor?: string;
+  tone?: 'positive' | 'negative' | 'neutral' | string;
   trend?: {
     value: string | number;
     direction: 'up' | 'down' | 'neutral';
@@ -18,10 +19,26 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   value,
   subtext,
   icon,
-  iconBg = 'rgba(37, 99, 235, 0.08)',
-  iconColor = 'var(--color-primary)',
+  iconBg,
+  iconColor,
+  tone,
   trend,
 }) => {
+  const resolvedBg =
+    iconBg ||
+    (tone === 'positive'
+      ? 'rgba(22, 163, 74, 0.08)'
+      : tone === 'negative'
+      ? 'rgba(220, 38, 38, 0.08)'
+      : 'rgba(37, 99, 235, 0.08)');
+
+  const resolvedColor =
+    iconColor ||
+    (tone === 'positive'
+      ? 'var(--color-positive, #16A34A)'
+      : tone === 'negative'
+      ? 'var(--color-negative, #DC2626)'
+      : 'var(--color-primary, #2563EB)');
   return (
     <div className="kpi-card">
       <div className="kpi-top">
