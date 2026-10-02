@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type NavTab = 'health' | 'ledger' | 'investor' | 'budgets' | 'more';
+export type NavTab = 'health' | 'ledger' | 'analytics' | 'investor' | 'budgets' | 'more';
 
 interface NavigationProps {
   activeTab: NavTab;
@@ -33,6 +33,17 @@ export const Navigation: React.FC<NavigationProps> = ({
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           <path d="M8 7h8" />
           <path d="M8 11h8" />
+        </svg>
+      ),
+    },
+    {
+      id: 'analytics' as NavTab,
+      label: 'Analytics',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
         </svg>
       ),
     },

@@ -17,6 +17,7 @@ import investorRoutes from './routes/investor';
 import strategiesRoutes from './routes/strategies';
 import toolsRoutes from './routes/tools';
 import importsRoutes from './routes/imports';
+import analyticsRoutes from './routes/analytics';
 import { refreshMonthlySummaries, computeNetWorth } from './lib/analytics';
 import { getRecurringTransactions } from './lib/commitments';
 
@@ -59,6 +60,7 @@ app.route('/api/recurring', recurringRoutes);
 app.route('/api/investments', investorRoutes);
 app.route('/api/strategies', strategiesRoutes);
 app.route('/api/imports', importsRoutes);
+app.route('/api/analytics', analyticsRoutes);
 app.route('/api', toolsRoutes);
 
 // Fallback 404 for API, or proxy to static assets

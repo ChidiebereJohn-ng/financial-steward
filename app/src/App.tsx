@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigation, NavTab } from './components/Navigation';
 import { HealthDashboard } from './screens/HealthDashboard';
 import { LedgerDashboard } from './screens/LedgerDashboard';
+import { AnalyticsScreen } from './screens/AnalyticsScreen';
 import { BudgetsScreen } from './screens/BudgetsScreen';
 import { GoalsScreen } from './screens/GoalsScreen';
 import { LiabilitiesScreen } from './screens/LiabilitiesScreen';
@@ -23,6 +24,7 @@ export const App: React.FC = () => {
       <main className="main-content">
         {activeTab === 'health' && <HealthDashboard />}
         {activeTab === 'ledger' && <LedgerDashboard />}
+        {activeTab === 'analytics' && <AnalyticsScreen />}
         {activeTab === 'investor' && <InvestorScreen />}
         {activeTab === 'budgets' && (
           <div>
