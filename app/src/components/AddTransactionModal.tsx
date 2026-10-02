@@ -161,13 +161,19 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     setError(null);
 
     try {
+      const selectedSource = incomeSources.find((s) => s.id === Number(incomeSourceId))?.name;
+      const selectedCategory = categories.find((c) => c.id === Number(categoryId))?.name;
+      const fallbackNote = direction === 'inflow'
+        ? (selectedSource ? `Inflow: ${selectedSource}` : 'Income Allocation')
+        : (purposeLabel.trim() || selectedCategory || 'Expense Debit');
+
       const payload: any = {
         date,
         direction,
         amount: numAmount,
         currency: 'NGN',
         account_id: accountId ? Number(accountId) : null,
-        note: note.trim() || null,
+        note: note.trim() || fallbackNote,
       };
 
       if (direction === 'inflow') {

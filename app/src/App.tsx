@@ -9,7 +9,7 @@ import { InvestorScreen } from './screens/InvestorScreen';
 import { PurchaseCalculatorScreen } from './screens/PurchaseCalculatorScreen';
 import { DigestScreen } from './screens/DigestScreen';
 import { RecurringScreen } from './screens/RecurringScreen';
-import { CsvExportCard } from './components/CsvExportCard';
+import { DataManagementScreen } from './screens/DataManagementScreen';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('health');
@@ -150,14 +150,14 @@ export const App: React.FC = () => {
                   border: `1px solid ${moreSubTab === 'export' ? 'var(--color-primary)' : 'var(--border-color)'}`,
                 }}
               >
-                Data Export & Backups
+                Data Management (Upload & Export)
               </button>
             </div>
 
             {moreSubTab === 'calculator' && <PurchaseCalculatorScreen />}
             {moreSubTab === 'digest' && <DigestScreen />}
             {moreSubTab === 'liabilities' && <LiabilitiesScreen />}
-            {moreSubTab === 'export' && <CsvExportCard />}
+            {moreSubTab === 'export' && <DataManagementScreen />}
           </div>
         )}
       </main>

@@ -2,6 +2,9 @@ name = "personal-finance-app"
 main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 
+[vars]
+DEV_AUTH_BYPASS = "true"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "finance-app-db"

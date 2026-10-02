@@ -249,14 +249,8 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
   const priorDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
   const priorMonth = priorDate.toISOString().slice(0, 7);
 
-  // 1. Current Net Worth & Historical Trend
-  let latestSnapshot = await db
-    .prepare('SELECT * FROM net_worth_snapshots ORDER BY date DESC, id DESC LIMIT 1')
-    .first<NetWorthSnapshot>();
-
-  if (!latestSnapshot) {
-    latestSnapshot = await computeNetWorth(db);
-  }
+  // 1. Current Net Worth & Historical Trend: dynamically compute fresh live net worth
+  const latestSnapshot = await computeNetWorth(db);
 
   const { results: netWorthTrend } = await db
     .prepare(
@@ -573,18 +567,20 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
          t.*,
          c.name as category_name,
          b.name as bucket_name,
-         a.name as account_name
+         a.name as account_name,
+         i.name as income_source_name
        FROM transactions t
        LEFT JOIN categories c ON t.category_id = c.id
        LEFT JOIN bucket_ledger_entries ble ON ble.transaction_id = t.id AND ble.entry_type IN ('expense_debit', 'allocation_credit')
        LEFT JOIN allocation_buckets b ON ble.bucket_id = b.id
        LEFT JOIN accounts a ON t.account_id = a.id
+       LEFT JOIN income_sources i ON t.income_source_id = i.id
        WHERE (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
        GROUP BY t.id
        ORDER BY t.date DESC, t.id DESC
-       LIMIT 50`
+       LIMIT 100`
     )
-    .all<Transaction & { category_name?: string; bucket_name?: string; account_name?: string }>();
+    .all<Transaction & { category_name?: string; bucket_name?: string; account_name?: string; income_source_name?: string }>();
 
   // 5. Upcoming commitments (due in <= 3 days, active)
   let upcoming: any[] = [];

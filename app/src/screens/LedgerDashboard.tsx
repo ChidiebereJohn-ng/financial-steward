@@ -27,12 +27,12 @@ export const LedgerDashboard: React.FC = () => {
   const [showAllTx, setShowAllTx] = useState(false);
 
   useEffect(() => {
-    fetchLedgerData();
+    fetchLedgerData(true);
   }, []);
 
-  const fetchLedgerData = async () => {
+  const fetchLedgerData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const res = await fetch('/api/dashboard/ledger', {
         headers: { 'x-dev-bypass': 'true' },
       });
@@ -43,7 +43,7 @@ export const LedgerDashboard: React.FC = () => {
     } catch (err) {
       console.error('Failed to load ledger dashboard data:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
@@ -607,7 +607,14 @@ export const LedgerDashboard: React.FC = () => {
                   </div>
                   <div className="tx-details">
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>{tx.note || tx.purpose_label || tx.category_name || 'Transaction'}</span>
+                      <span>
+                        {tx.note ||
+                          (tx.direction === 'inflow'
+                            ? (tx as any).income_source_name
+                              ? `Inflow: ${(tx as any).income_source_name}`
+                              : 'Income Allocation'
+                            : tx.purpose_label || tx.category_name || 'Expense Debit')}
+                      </span>
                       {tx.note?.includes('[DELETED]') && (
                         <span
                           style={{
@@ -624,19 +631,40 @@ export const LedgerDashboard: React.FC = () => {
                       )}
                     </h4>
                     <p>
-                      {tx.category_name || (tx.direction === 'inflow' ? 'Income Allocation' : 'Expense')} • {tx.date}
-                      {tx.purpose_label && ` • Purpose: ${tx.purpose_label}`}
+                      {tx.direction === 'inflow'
+                        ? `${(tx as any).income_source_name ? `Source: ${(tx as any).income_source_name} • ` : 'Inflow • '}${tx.date}`
+                        : `${tx.category_name ? `${tx.category_name} • ` : ''}${tx.date}`}
+                      {tx.purpose_label && !tx.note?.includes(tx.purpose_label) && ` • Purpose: ${tx.purpose_label}`}
+                      {tx.account_name && ` • ${tx.account_name}`}
                     </p>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {tx.bucket_name && (
                     <BucketBadge bucketKey={tx.bucket_name.toLowerCase()} name={tx.bucket_name} />
                   )}
                   <div className={`tx-amount ${tx.direction}`}>
                     {tx.direction === 'inflow' ? '+' : '-'}{formatNgn(tx.amount)}
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTxId(tx.id);
+                    }}
+                    title="Inspect or Delete / Reverse transaction"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px 6px',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      opacity: 0.7,
+                    }}
+                  >
+                    🗑️
+                  </button>
                   <span style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>›</span>
                 </div>
               </div>

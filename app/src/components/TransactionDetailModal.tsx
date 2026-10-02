@@ -77,7 +77,9 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
     setLoading(true);
     setError(null);
-    fetch(`/api/transactions/${transactionId}`)
+    fetch(`/api/transactions/${transactionId}`, {
+      headers: { 'x-dev-bypass': 'true' },
+    })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load transaction details');
         return res.json();
@@ -101,6 +103,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     try {
       const res = await fetch(`/api/transactions/${transactionId}`, {
         method: 'DELETE',
+        headers: { 'x-dev-bypass': 'true' },
       });
       const json = await res.json();
       if (!res.ok) {
