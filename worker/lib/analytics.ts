@@ -91,7 +91,7 @@ export async function computeNetWorth(
              CASE WHEN direction = 'inflow' THEN amount ELSE -amount END
            ), 0) as balance 
            FROM transactions 
-           WHERE account_id = ? AND (note IS NULL OR note NOT LIKE '[DELETED]%')`
+           WHERE account_id = ? AND (note IS NULL OR note NOT LIKE '%[DELETED]%')`
         )
         .bind(account.id)
         .first<{ balance: number }>();
@@ -182,7 +182,7 @@ export async function refreshMonthlySummaries(
        FROM transactions t
        JOIN bucket_ledger_entries ble ON ble.transaction_id = t.id AND ble.entry_type = 'expense_debit'
        WHERE strftime('%Y-%m', t.date) = ?
-         AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
+         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
        GROUP BY t.category_id, ble.bucket_id`
     )
     .bind(month)
@@ -197,7 +197,7 @@ export async function refreshMonthlySummaries(
        FROM transactions t
        JOIN allocation_runs ar ON ar.transaction_id = t.id
        WHERE strftime('%Y-%m', t.date) = ?
-         AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
+         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
        GROUP BY ar.bucket_id`
     )
     .bind(month)
@@ -269,7 +269,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
        FROM transactions 
        WHERE direction = 'inflow' 
          AND strftime('%Y-%m', date) = ? 
-         AND (note IS NULL OR note NOT LIKE '[DELETED]%')`
+         AND (note IS NULL OR note NOT LIKE '%[DELETED]%')`
     )
     .bind(currentMonth)
     .first<{ gross: number }>();
@@ -282,8 +282,8 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
        JOIN transactions t ON ar.transaction_id = t.id
        JOIN allocation_buckets b ON ar.bucket_id = b.id
        WHERE b.key IN ('savings', 'invest')
-         AND strftime('%Y-%m', t.date) = ?
-         AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')`
+         AND strftime('%Y-%m', t.date) = ? 
+         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')`
     )
     .bind(currentMonth)
     .first<{ saved: number }>();
@@ -299,7 +299,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
        FROM transactions 
        WHERE direction = 'inflow' 
          AND strftime('%Y-%m', date) = ? 
-         AND (note IS NULL OR note NOT LIKE '[DELETED]%')`
+         AND (note IS NULL OR note NOT LIKE '%[DELETED]%')`
     )
     .bind(priorMonth)
     .first<{ gross: number }>();
@@ -311,8 +311,8 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
        JOIN transactions t ON ar.transaction_id = t.id
        JOIN allocation_buckets b ON ar.bucket_id = b.id
        WHERE b.key IN ('savings', 'invest')
-         AND strftime('%Y-%m', t.date) = ?
-         AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')`
+         AND strftime('%Y-%m', t.date) = ? 
+         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')`
     )
     .bind(priorMonth)
     .first<{ saved: number }>();
@@ -332,7 +332,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
        LEFT JOIN allocation_runs ar ON b.id = ar.bucket_id
        LEFT JOIN transactions t ON ar.transaction_id = t.id 
          AND strftime('%Y-%m', t.date) = ?
-         AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
+         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
        GROUP BY b.key`
     )
     .bind(currentMonth)
@@ -373,7 +373,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
          LEFT JOIN transactions t ON t.category_id = c.id 
            AND t.direction = 'outflow'
            AND strftime('%Y-%m', t.date) = ?
-           AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
+           AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
          WHERE b.month = ?
          GROUP BY c.id, c.name, b.planned_amount`
       )
@@ -410,7 +410,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
          JOIN transactions t ON t.category_id = c.id 
            AND t.direction = 'outflow'
            AND strftime('%Y-%m', t.date) = ?
-           AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
+           AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
          GROUP BY c.id, c.name
          HAVING actual > 0`
       )
@@ -456,7 +456,7 @@ export async function getHealthDashboardData(db: D1Database): Promise<HealthDash
        FROM transactions 
        WHERE direction = 'outflow' 
          AND date >= date('now', '-30 days')
-         AND (note IS NULL OR note NOT LIKE '[DELETED]%')`
+         AND (note IS NULL OR note NOT LIKE '%[DELETED]%')`
     )
     .first<{ total_outflow: number }>();
 
@@ -509,7 +509,7 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
          COALESCE(SUM(CASE WHEN direction = 'inflow' THEN amount ELSE 0 END), 0) as total_inflow,
          COALESCE(SUM(CASE WHEN direction = 'outflow' THEN amount ELSE 0 END), 0) as total_outflow
        FROM transactions
-       WHERE (note IS NULL OR note NOT LIKE '[DELETED]%')`
+       WHERE (note IS NULL OR note NOT LIKE '%[DELETED]%')`
     )
     .first<{ total_inflow: number; total_outflow: number }>();
 
@@ -530,7 +530,7 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
          COALESCE(SUM(CASE WHEN direction = 'outflow' THEN amount ELSE 0 END), 0) as outflow
        FROM transactions
        WHERE date >= date('now', '-30 days')
-         AND (note IS NULL OR note NOT LIKE '[DELETED]%')
+         AND (note IS NULL OR note NOT LIKE '%[DELETED]%')
        GROUP BY date
        ORDER BY date ASC`
     )
@@ -545,7 +545,7 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
            COALESCE(SUM(CASE WHEN direction = 'inflow' THEN amount ELSE 0 END), 0) as inflow,
            COALESCE(SUM(CASE WHEN direction = 'outflow' THEN amount ELSE 0 END), 0) as outflow
          FROM transactions
-         WHERE (note IS NULL OR note NOT LIKE '[DELETED]%')
+         WHERE (note IS NULL OR note NOT LIKE '%[DELETED]%')
          GROUP BY date
          ORDER BY date DESC
          LIMIT 30`
@@ -575,7 +575,7 @@ export async function getLedgerDashboardData(db: D1Database): Promise<LedgerDash
        LEFT JOIN allocation_buckets b ON ble.bucket_id = b.id
        LEFT JOIN accounts a ON t.account_id = a.id
        LEFT JOIN income_sources i ON t.income_source_id = i.id
-       WHERE (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
+       WHERE (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
        GROUP BY t.id
        ORDER BY t.date DESC, t.id DESC
        LIMIT 100`

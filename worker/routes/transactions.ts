@@ -68,6 +68,9 @@ transactionsApp.get('/', async (c) => {
     );
     params.push(bucketId);
   }
+  if (query.include_deleted !== 'true') {
+    conditions.push("(t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')");
+  }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const sql = `

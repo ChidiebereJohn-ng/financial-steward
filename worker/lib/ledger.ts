@@ -578,8 +578,9 @@ export async function deleteTransaction(
       .bind(id, 'status', 'active', 'deleted')
   );
 
-  // 4. Append deletion note to transaction
-  const deletedNote = tx.note ? `${tx.note} [DELETED]` : '[DELETED]';
+  // 4. Prepend deletion tag to note
+  const cleanNote = tx.note ? tx.note.replace(/\[DELETED\]/g, '').trim() : '';
+  const deletedNote = cleanNote ? `[DELETED] ${cleanNote}` : '[DELETED]';
   statements.push(
     db
       .prepare('UPDATE transactions SET note = ? WHERE id = ?')

@@ -66,7 +66,7 @@ export async function getBudgetVariance(
          COALESCE(b.planned_amount, 0) as planned,
          COALESCE(SUM(
            CASE 
-             WHEN t.direction = 'outflow' AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%') 
+             WHEN t.direction = 'outflow' AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%') 
              THEN t.amount 
              ELSE 0 
            END
@@ -77,7 +77,7 @@ export async function getBudgetVariance(
        LEFT JOIN transactions t ON t.category_id = c.id 
          AND t.direction = 'outflow'
          AND strftime('%Y-%m', t.date) = ?
-         AND (t.note IS NULL OR t.note NOT LIKE '[DELETED]%')
+         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
        GROUP BY c.id, c.name, c.default_bucket_id, ab.key, b.planned_amount
        ORDER BY c.name ASC`
     )
