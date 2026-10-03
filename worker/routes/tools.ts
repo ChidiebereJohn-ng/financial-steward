@@ -187,4 +187,63 @@ app.get('/export', async (c) => {
   }
 });
 
+// ----------------------------------------------------
+// Database Reset / Clean Slate Route
+// ----------------------------------------------------
+
+app.post('/database/reset', async (c) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM bucket_transfers;'),
+      c.env.DB.prepare('DELETE FROM bucket_ledger_entries;'),
+      c.env.DB.prepare('DELETE FROM allocation_runs;'),
+      c.env.DB.prepare('DELETE FROM transaction_audit_log;'),
+      c.env.DB.prepare('DELETE FROM transactions;'),
+      c.env.DB.prepare('DELETE FROM recurring_transactions;'),
+      c.env.DB.prepare('DELETE FROM budgets;'),
+      c.env.DB.prepare('DELETE FROM goals;'),
+      c.env.DB.prepare('DELETE FROM liabilities;'),
+      c.env.DB.prepare('DELETE FROM investment_price_updates;'),
+      c.env.DB.prepare('DELETE FROM investments;'),
+      c.env.DB.prepare('DELETE FROM purchase_calculations;'),
+      c.env.DB.prepare('DELETE FROM import_batches;'),
+      c.env.DB.prepare('DELETE FROM monthly_summaries;'),
+      c.env.DB.prepare('DELETE FROM net_worth_snapshots;'),
+      c.env.DB.prepare('UPDATE accounts SET last_reconciled_balance = 0.0;'),
+      c.env.DB.prepare(`
+        DELETE FROM sqlite_sequence WHERE name IN (
+          'transactions',
+          'allocation_runs',
+          'bucket_ledger_entries',
+          'bucket_transfers',
+          'transaction_audit_log',
+          'recurring_transactions',
+          'budgets',
+          'goals',
+          'liabilities',
+          'investments',
+          'investment_price_updates',
+          'purchase_calculations',
+          'import_batches',
+          'net_worth_snapshots',
+          'monthly_summaries'
+        );
+      `),
+      c.env.DB.prepare(`
+        INSERT INTO net_worth_snapshots (date, total_assets, total_liabilities, net_worth, base_currency)
+        VALUES (?, 0.0, 0.0, 0.0, 'NGN');
+      `).bind(today),
+    ]);
+
+    return c.json({
+      success: true,
+      message: 'Database successfully cleared. Fresh clean slate initialized.',
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Failed to reset database' }, 500);
+  }
+});
+
 export default app;

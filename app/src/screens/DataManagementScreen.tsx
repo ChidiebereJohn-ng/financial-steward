@@ -10,6 +10,9 @@ export const DataManagementScreen: React.FC = () => {
   const [result, setResult] = useState<ImportProcessingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -147,6 +150,37 @@ export const DataManagementScreen: React.FC = () => {
       setExportFeedback(err.message || 'Failed to download export.');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    try {
+      setResetting(true);
+      setResetSuccess(null);
+      setError(null);
+
+      const res = await fetch('/api/database/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-dev-bypass': 'true',
+        },
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setResetSuccess(json.message || 'Database successfully wiped clean to zero.');
+        setResetConfirm(false);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      } else {
+        setError(json.error || 'Failed to reset database.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Network error during reset.');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -434,6 +468,142 @@ export const DataManagementScreen: React.FC = () => {
             {downloading ? 'Generating Export File...' : 'Download Full CSV Export'}
           </button>
         </div>
+      </div>
+
+      {/* Danger Zone: Reset Database / Clean Slate */}
+      <div
+        style={{
+          backgroundColor: 'rgba(239, 68, 68, 0.03)',
+          borderRadius: 'var(--radius-card)',
+          padding: '24px',
+          border: '1px solid rgba(239, 68, 68, 0.25)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              color: 'var(--color-negative)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '20px',
+            }}
+          >
+            ⚠️
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--color-negative)' }}>
+              Clean Slate / Reset Test Data
+            </h3>
+            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              Permanently wipe all demo transactions, bucket ledger logs, goals, liabilities, and investment entries to start a fresh project.
+            </p>
+          </div>
+        </div>
+
+        <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.6', margin: 0 }}>
+          This operation resets all accounts and bucket balances back to <strong>₦0.00</strong>. Your base categories, allocation rules (e.g. 10/10/20/15/35/10), accounts, and structure are completely preserved so you can immediately begin recording real personal data.
+        </p>
+
+        {resetSuccess && (
+          <div
+            style={{
+              padding: '10px 14px',
+              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              border: '1px solid var(--color-positive)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--color-positive)',
+              fontSize: '13px',
+            }}
+          >
+            {resetSuccess} Reloading app...
+          </div>
+        )}
+
+        {!resetConfirm ? (
+          <div>
+            <button
+              onClick={() => setResetConfirm(true)}
+              style={{
+                padding: '10px 18px',
+                backgroundColor: 'transparent',
+                color: 'var(--color-negative)',
+                border: '1px solid var(--color-negative)',
+                borderRadius: 'var(--radius-sm)',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span>🗑️</span>
+              Reset Database to Clean Slate
+            </button>
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: '16px',
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-negative)' }}>
+              Are you sure? This will delete all demo transactions, history, and reset your net worth to ₦0.00. This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button
+                onClick={handleResetDatabase}
+                disabled={resetting}
+                style={{
+                  padding: '9px 16px',
+                  backgroundColor: 'var(--color-negative)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: resetting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                {resetting ? 'Wiping Database...' : 'Yes, Wipe Everything & Reset to ₦0'}
+              </button>
+              <button
+                onClick={() => setResetConfirm(false)}
+                disabled={resetting}
+                style={{
+                  padding: '9px 16px',
+                  backgroundColor: 'transparent',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontWeight: 500,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

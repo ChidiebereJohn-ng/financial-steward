@@ -522,7 +522,7 @@ export const AnalyticsScreen: React.FC = () => {
       </div>
 
       {/* 3. Executive Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '14px' }}>
         <KpiCard
           label="Total Inflows"
           value={formatNgn(data?.summary.total_inflow || 0)}
@@ -595,7 +595,7 @@ export const AnalyticsScreen: React.FC = () => {
       )}
 
       {/* 5. Two-Column Detailed Breakdown: Categorized Expenses & Inflows */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '20px' }}>
         {/* Left: Categorized Expenses */}
         <div style={{
           backgroundColor: 'var(--bg-card, #FFFFFF)',

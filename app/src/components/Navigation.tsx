@@ -128,8 +128,22 @@ export const Navigation: React.FC<NavigationProps> = ({
             onClick={() => onTabChange(item.id)}
             className={`mobile-nav-item ${activeTab === item.id ? 'active' : ''}`}
           >
-            {item.icon}
-            <span>{item.id === 'health' ? 'Health' : item.id === 'ledger' ? 'Ledger' : item.id === 'investor' ? 'Investor' : item.id === 'budgets' ? 'Budgets' : 'More'}</span>
+            <div style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {item.icon}
+            </div>
+            <span>
+              {item.id === 'health'
+                ? 'Health'
+                : item.id === 'ledger'
+                ? 'Movement'
+                : item.id === 'analytics'
+                ? 'Analytics'
+                : item.id === 'investor'
+                ? 'Investor'
+                : item.id === 'budgets'
+                ? 'Budgets'
+                : 'Tools'}
+            </span>
           </button>
         ))}
       </nav>
