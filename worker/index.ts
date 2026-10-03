@@ -20,6 +20,7 @@ import importsRoutes from './routes/imports';
 import analyticsRoutes from './routes/analytics';
 import { refreshMonthlySummaries, computeNetWorth } from './lib/analytics';
 import { getRecurringTransactions } from './lib/commitments';
+import { generateResearchBriefings } from './lib/tools';
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -96,6 +97,16 @@ export async function handleScheduled(
         console.log(`[CRON] Recurring commitments scan: ${upcoming_count} upcoming due within 3 days (Total active: ${recurring.length})`);
       } catch (err: any) {
         console.log('[CRON] Recurring commitments scan skipped or table not initialized:', err.message);
+      }
+
+      // Section 11 APP_LOGIC.md: 0 6 * * 1 -> Weekly Monday research digest generation
+      if (event.cron === '0 6 * * 1' || new Date().getUTCDay() === 1) {
+        try {
+          const digestResult = await generateResearchBriefings(env.DB, env.CLAUDE_API_KEY);
+          console.log(`[CRON] Research digest briefings generated: ${digestResult.added.length} items (Source: ${digestResult.source})`);
+        } catch (err: any) {
+          console.error('[CRON] Research digest generation failed:', err.message);
+        }
       }
     } catch (err) {
       console.error('[CRON] Execution failed:', err);

@@ -6,6 +6,7 @@ import {
   getDigestItems,
   markDigestItemRead,
   createDigestItem,
+  generateResearchBriefings,
 } from '../lib/tools';
 import { generateFullCsvExport } from '../lib/export';
 
@@ -123,6 +124,38 @@ app.post('/digest', async (c) => {
     return c.json({ item }, 201);
   } catch (err: any) {
     return c.json({ error: err.message || 'Failed to create digest item' }, 400);
+  }
+});
+
+// POST /api/digest/refresh — Generate updated paper-asset research briefings
+app.post('/digest/refresh', async (c) => {
+  try {
+    const result = await generateResearchBriefings(c.env.DB, c.env.CLAUDE_API_KEY);
+    const allItems = await getDigestItems(c.env.DB, 50);
+    return c.json({
+      message: `Successfully generated ${result.added.length} research briefing(s)`,
+      source: result.source,
+      added: result.added,
+      items: allItems,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Failed to refresh research digest' }, 500);
+  }
+});
+
+// POST /api/digest/generate — Alias for refresh
+app.post('/digest/generate', async (c) => {
+  try {
+    const result = await generateResearchBriefings(c.env.DB, c.env.CLAUDE_API_KEY);
+    const allItems = await getDigestItems(c.env.DB, 50);
+    return c.json({
+      message: `Successfully generated ${result.added.length} research briefing(s)`,
+      source: result.source,
+      added: result.added,
+      items: allItems,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Failed to generate research digest' }, 500);
   }
 });
 

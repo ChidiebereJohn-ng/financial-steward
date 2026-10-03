@@ -213,3 +213,134 @@ export async function createDigestItem(
 
   return created!;
 }
+
+/**
+ * Pre-curated institutional paper-asset research briefings.
+ */
+export const PAPER_ASSET_INTELLIGENCE_BRIEFS = [
+  {
+    topic: 'Nigerian Treasury Bills (NTB): 364-Day Auction Yields & Reinvestment Laddering',
+    summary: 'The Central Bank of Nigeria (CBN) maintains elevated stop rates on 364-day Nigerian Treasury Bills (NTBs), consistently yielding between 19.5% and 21.5% at primary market auctions. For individual paper-asset investors, NTBs provide a sovereign risk-free sanctuary with zero capital risk and upfront interest discounting. Tactical strategy: Deploy a 4-tier ladder (allocating across 91-day, 182-day, and 364-day tenors) to capture peak annual yields while maintaining rolling quarterly liquidity for opportunistic re-entry.',
+    source_url: 'https://www.cbn.gov.ng',
+  },
+  {
+    topic: 'FGN Savings Bonds: Quarterly Sovereign Cash Flow & Tax-Free Compounding',
+    summary: 'The Debt Management Office (DMO) offers 2-Year and 3-Year Federal Government of Nigeria (FGN) Savings Bonds with coupon rates averaging 17.0% - 18.5% payable quarterly directly into bank accounts. Tailor-made for retail paper-asset portfolios with entry minimums of ₦5,000. Benefit: Backed by the full faith and credit of the Federal Republic of Nigeria, exempt from CAMA withholding taxes, and provides predictable quarterly cash distributions ideal for feeding the Kingdom and Charity buckets.',
+    source_url: 'https://www.dmo.gov.ng',
+  },
+  {
+    topic: 'Money Market Funds (MMF) vs Commercial Papers (CP): Liquidity Optimization',
+    summary: 'SEC-regulated Money Market Funds (Stanbic IBTC, ARM, United Capital, Chapel Hill Denham) yield between 18.0% and 20.5% with daily interest accrual and T+1 liquidity, making them the optimal holding tank for the Expenses and Savings buckets. Conversely, Tier-1 Corporate Commercial Papers (Dangote, MTN Nigeria, Flour Mills) offer 22.0% - 24.5% for 180-day to 270-day tenors. Rule of engagement: Require investment-grade ratings (A- or higher by Agusto/GCR) before substituting sovereign bills with corporate paper.',
+    source_url: 'https://sec.gov.ng',
+  },
+  {
+    topic: 'NGX Tier-1 Banking Aristocrats: Dividend Yields vs Fixed Income Spreads',
+    summary: 'Tier-1 Nigerian Exchange (NGX) financial institutions (GTCO, Zenith Bank, UBA) maintain robust capital adequacy ratios above 20% and provide historical dividend yields ranging from 12% to 16%. In paper-asset equity allocation, prioritising dividend aristocrats with low payout ratios (<40%) ensures sustainable real-term income and potential equity re-rating as foreign portfolio investments normalize.',
+    source_url: 'https://ngxgroup.com',
+  },
+  {
+    topic: 'Global Dollar Paper Assets: US Treasury Bills (SGOV/BIL) & S&P 500 Index DCA',
+    summary: 'Systematic Dollar-Cost Averaging (DCA) into offshore paper assets provides essential balance sheet immunization against localized currency devaluation. Ultra-short US Treasury ETFs (SGOV, BIL) yield 4.8% - 5.2% risk-free in USD, while broad-market index funds (VOO, VTI) capture global economic productivity. Recommended allocation: Channel 20-30% of the Investment bucket into USD paper assets via domiciliary accounts or regulated brokerages.',
+    source_url: 'https://www.investopedia.com',
+  },
+];
+
+/**
+ * Automatically generates updated paper-asset research briefings.
+ * If CLAUDE_API_KEY is available, calls Anthropic Claude API for live AI generation.
+ * Otherwise, rotates through authoritative paper-asset market intelligence models.
+ */
+export async function generateResearchBriefings(
+  db: D1Database,
+  apiKey?: string
+): Promise<{ added: DigestItem[]; source: 'ai' | 'curated' }> {
+  // If API key is provided, attempt live Claude API briefing generation
+  if (apiKey && apiKey.trim() !== '') {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey.trim(),
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 1000,
+          messages: [
+            {
+              role: 'user',
+              content: `Generate 2 actionable financial research briefing items for a personal finance steward investing in Nigerian and global paper assets (e.g., Nigerian Treasury Bills, FGN Savings Bonds, Money Market Funds, Commercial Papers, NGX Dividend Stocks, Dollar ETFs).
+Return strictly valid JSON array of objects with fields:
+[
+  {
+    "topic": "Concise headline (max 80 chars)",
+    "summary": "Rich 2-3 paragraph institutional briefing with yield data, risk-reward analysis, and stewardship advice",
+    "source_url": "Valid official URL e.g. https://www.cbn.gov.ng, https://www.dmo.gov.ng, https://ngxgroup.com, https://sec.gov.ng"
+  }
+]`,
+            },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        const json: any = await response.json();
+        const contentText = json?.content?.[0]?.text || '';
+        const match = contentText.match(/\[[\s\S]*\]/);
+        if (match) {
+          const items: Array<{ topic: string; summary: string; source_url?: string }> = JSON.parse(match[0]);
+          const createdList: DigestItem[] = [];
+          for (const item of items) {
+            if (item.topic && item.summary) {
+              const created = await createDigestItem(db, {
+                topic: item.topic,
+                summary: item.summary,
+                source_url: item.source_url || 'https://www.cbn.gov.ng',
+                read_status: 0,
+              });
+              createdList.push(created);
+            }
+          }
+          if (createdList.length > 0) {
+            return { added: createdList, source: 'ai' };
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Claude API briefing generation failed, falling back to curated intelligence:', err);
+    }
+  }
+
+  // Fallback / standard curated paper-asset intelligence briefs
+  const existing = await db
+    .prepare('SELECT topic FROM digest_items ORDER BY id DESC LIMIT 20')
+    .all<{ topic: string }>();
+  const existingTopics = new Set((existing.results || []).map((r) => r.topic.toLowerCase()));
+
+  const candidateBriefs = PAPER_ASSET_INTELLIGENCE_BRIEFS.filter(
+    (b) => !existingTopics.has(b.topic.toLowerCase())
+  );
+
+  const selected = candidateBriefs.length >= 2
+    ? candidateBriefs.slice(0, 2)
+    : candidateBriefs.length === 1
+    ? [candidateBriefs[0], PAPER_ASSET_INTELLIGENCE_BRIEFS[0]]
+    : [
+        PAPER_ASSET_INTELLIGENCE_BRIEFS[0],
+        PAPER_ASSET_INTELLIGENCE_BRIEFS[1],
+      ];
+
+  const added: DigestItem[] = [];
+  for (const brief of selected) {
+    const created = await createDigestItem(db, {
+      topic: brief.topic,
+      summary: brief.summary,
+      source_url: brief.source_url,
+      read_status: 0,
+    });
+    added.push(created);
+  }
+
+  return { added, source: 'curated' };
+}

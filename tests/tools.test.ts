@@ -10,6 +10,7 @@ import {
   getDigestItems,
   markDigestItemRead,
   createDigestItem,
+  generateResearchBriefings,
 } from '../worker/lib/tools';
 import {
   escapeCsvCell,
@@ -358,6 +359,31 @@ describe('Module 7: Purchase Calculator, Research Digest & CSV Export', () => {
 
       const items = await getDigestItems(mockEnv.DB, 5);
       expect(items[0].topic).toBe('AI Compute & Semiconductor Stocks');
+    });
+
+    it('should generate updated paper-asset research briefings on demand', async () => {
+      const result = await generateResearchBriefings(mockEnv.DB);
+      expect(result.added.length).toBeGreaterThan(0);
+      expect(result.source).toBe('curated');
+      expect(result.added[0].topic).toBeDefined();
+      expect(result.added[0].summary).toBeDefined();
+
+      const items = await getDigestItems(mockEnv.DB, 10);
+      expect(items.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('POST /api/digest/refresh should return fresh research briefings via HTTP', async () => {
+      const res = await app.request('/api/digest/refresh', {
+        method: 'POST',
+        headers: { 'x-dev-bypass': 'true' },
+      }, mockEnv);
+
+      expect(res.status).toBe(200);
+      const json = await res.json<any>();
+      expect(json.message).toContain('Successfully generated');
+      expect(Array.isArray(json.added)).toBe(true);
+      expect(Array.isArray(json.items)).toBe(true);
+      expect(json.items.length).toBeGreaterThanOrEqual(4);
     });
   });
 

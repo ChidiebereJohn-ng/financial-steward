@@ -4,9 +4,12 @@ import type { DigestItem } from '../../../worker/types';
 export const DigestScreen: React.FC = () => {
   const [items, setItems] = useState<DigestItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'tbills' | 'bonds' | 'mmf' | 'equities' | 'global'>('all');
   const [newTopic, setNewTopic] = useState('');
   const [newSummary, setNewSummary] = useState('');
   const [newSourceUrl, setNewSourceUrl] = useState('');
@@ -38,6 +41,28 @@ export const DigestScreen: React.FC = () => {
       showFeedback('error', 'Network error fetching digest items');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefreshBriefing = async () => {
+    try {
+      setRefreshing(true);
+      const res = await fetch('/api/digest/refresh', {
+        method: 'POST',
+        headers: { 'x-dev-bypass': 'true' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items || []);
+        showFeedback('success', data.message || 'Generated updated paper-asset research briefings!');
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        showFeedback('error', errJson.error || 'Failed to refresh research digest');
+      }
+    } catch (err) {
+      showFeedback('error', 'Network error refreshing research briefings');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -108,6 +133,27 @@ export const DigestScreen: React.FC = () => {
 
   const unreadCount = items.filter((i) => i.read_status === 0).length;
 
+  const filteredItems = items.filter((item) => {
+    if (categoryFilter === 'all') return true;
+    const text = (item.topic + ' ' + item.summary).toLowerCase();
+    if (categoryFilter === 'tbills') {
+      return text.includes('treasury') || text.includes('t-bill') || text.includes('ntb') || text.includes('cbn');
+    }
+    if (categoryFilter === 'bonds') {
+      return text.includes('bond') || text.includes('fgn') || text.includes('dmo') || text.includes('coupon');
+    }
+    if (categoryFilter === 'mmf') {
+      return text.includes('money market') || text.includes('commercial paper') || text.includes('mmf') || text.includes('liquidity');
+    }
+    if (categoryFilter === 'equities') {
+      return text.includes('equities') || text.includes('dividend') || text.includes('ngx') || text.includes('stock') || text.includes('bank');
+    }
+    if (categoryFilter === 'global') {
+      return text.includes('dollar') || text.includes('usd') || text.includes('s&p') || text.includes('eurobond') || text.includes('etf');
+    }
+    return true;
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header */}
@@ -133,32 +179,58 @@ export const DigestScreen: React.FC = () => {
             )}
           </div>
           <p style={{ margin: '6px 0 0 0', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-            Curated financial briefings, macroeconomic intelligence, and investment insights.
+            Actionable paper-asset intelligence, sovereign fixed-income yields, and macro compounding briefings.
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          style={{
-            padding: '10px 18px',
-            backgroundColor: 'var(--color-primary)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add Intel Note
-        </button>
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleRefreshBriefing}
+            disabled={refreshing}
+            style={{
+              padding: '10px 18px',
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--color-primary)',
+              border: '1px solid var(--color-primary)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: refreshing ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              opacity: refreshing ? 0.7 : 1,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>{refreshing ? '⏳' : '🔄'}</span>
+            {refreshing ? 'Refreshing Briefings...' : 'Refresh Research'}
+          </button>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              padding: '10px 18px',
+              backgroundColor: 'var(--color-primary)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add Intel Note
+          </button>
+        </div>
       </div>
 
       {feedback && (
@@ -177,6 +249,117 @@ export const DigestScreen: React.FC = () => {
         </div>
       )}
 
+      {/* Strategic Guide Card: How Paper Assets Work in Financial Steward */}
+      {showGuide && (
+        <div
+          style={{
+            backgroundColor: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: 'var(--radius-md, 12px)',
+            padding: '20px',
+            position: 'relative',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>📜</span>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#1E293B' }}>
+                How to Use Research Digest for Paper Asset Investing
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowGuide(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94A3B8',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '2px 6px',
+              }}
+              title="Dismiss guide"
+            >
+              ✕
+            </button>
+          </div>
+
+          <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6, margin: '0 0 14px 0' }}>
+            <strong>Paper assets</strong> are intangible contractual claims on cash flows (Treasury Bills, FGN Savings Bonds, Money Market Funds, Commercial Papers, NGX Dividend Equities, Dollar Index ETFs). They offer zero property management friction, high liquidity, and mathematically predictable compounding.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px' }}>
+            <div style={{ backgroundColor: '#FFFFFF', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#2563EB', marginBottom: '4px' }}>
+                1. Sovereign Hurdle Rate
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.5 }}>
+                Always benchmark yields against 364-day CBN Treasury Bills (19-21%). Never risk capital on assets that yield less than the sovereign risk-free rate.
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#16A34A', marginBottom: '4px' }}>
+                2. Operational Liquidity
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.5 }}>
+                Keep your <strong>Expenses & Savings</strong> bucket reserves in SEC-regulated Money Market Funds (MMFs) for daily interest accrual with T+1 instant redemption.
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#8B5CF6', marginBottom: '4px' }}>
+                3. Quarterly Cash Flows
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.5 }}>
+                Deploy <strong>Investment bucket</strong> capital into FGN Savings Bonds (17-18% coupon paid quarterly) to generate tax-free distributions directly into your bank.
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#D97706', marginBottom: '4px' }}>
+                4. Automated Weekly Briefs
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.5 }}>
+                The Cloudflare Worker runs every Monday at 06:00 UTC to evaluate yield movements. Click <strong>Refresh Research</strong> anytime to trigger an immediate update.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Filter Tabs */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginRight: '4px' }}>
+          Asset Focus:
+        </span>
+        {[
+          { key: 'all', label: `All Briefings (${items.length})` },
+          { key: 'tbills', label: 'Treasury Bills (NTBs)' },
+          { key: 'bonds', label: 'FGN Bonds' },
+          { key: 'mmf', label: 'Money Market & CPs' },
+          { key: 'equities', label: 'NGX Equities' },
+          { key: 'global', label: 'Dollar Assets' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setCategoryFilter(tab.key as any)}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 600,
+              border: categoryFilter === tab.key ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+              backgroundColor: categoryFilter === tab.key ? 'var(--color-primary)' : 'var(--bg-card)',
+              color: categoryFilter === tab.key ? '#ffffff' : 'var(--color-text-secondary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Feed List */}
       {loading ? (
         <div
@@ -190,7 +373,7 @@ export const DigestScreen: React.FC = () => {
         >
           Loading financial intelligence digest...
         </div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <div
           style={{
             padding: '48px',
@@ -200,11 +383,11 @@ export const DigestScreen: React.FC = () => {
             color: 'var(--color-text-secondary)',
           }}
         >
-          No digest items available yet. Click "Add Intel Note" to record your first insight.
+          No briefings match this filter. Click "Refresh Research" or select "All Briefings" to view current intelligence.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {items.map((item) => {
+          {filteredItems.map((item) => {
             const isUnread = item.read_status === 0;
             const isExpanded = expandedId === item.id;
 
