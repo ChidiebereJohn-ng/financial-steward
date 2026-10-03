@@ -296,6 +296,17 @@ describe('Analytics & Cash Flow Breakdown Endpoint Tests', () => {
     expect(json.summary.savings_invest_net).toBe(0);
     expect(json.summary.savings_invest_rate).toBe(0);
 
+    // Separated savings & invest checks
+    expect(json.summary.savings).toBeDefined();
+    expect(json.summary.savings.allocated).toBe(14000);
+    expect(json.summary.savings.transfer_out).toBe(14000);
+    expect(json.summary.savings.net_retained).toBe(0);
+
+    expect(json.summary.invest).toBeDefined();
+    expect(json.summary.invest.allocated).toBe(14000);
+    expect(json.summary.invest.transfer_out).toBe(14000);
+    expect(json.summary.invest.net_retained).toBe(0);
+
     // Bucket transfers list should contain the 2 transfers
     expect(json.bucket_transfers.length).toBe(2);
     expect(json.bucket_transfers[0].amount).toBe(14000);
@@ -305,5 +316,43 @@ describe('Analytics & Cash Flow Breakdown Endpoint Tests', () => {
     expect(transferEntries.length).toBe(2);
     expect(transferEntries[0].subtype).toBe('bucket_transfer');
     expect(transferEntries[0].category_name).toContain('→');
+  });
+
+  it('should accurately capture movements into the Investment bucket separated from Savings', async () => {
+    // Execute a fund movement into Investment bucket (id=4) from Expenses (id=6)
+    const moveRes = await app.request('/api/buckets/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
+      body: JSON.stringify({
+        from_bucket_id: 6, // Expenses
+        to_bucket_id: 4,   // Invest
+        amount: 5000,
+        date: '2026-10-18',
+        reason: 'Surplus cash reinvested into paper assets',
+      }),
+    }, mockEnv);
+    expect(moveRes.status).toBe(201);
+
+    // Query Analytics Breakdown for 2026-10
+    const analyticsRes = await app.request('/api/analytics/breakdown?month=2026-10', {
+      method: 'GET',
+      headers: { 'x-dev-bypass': 'true' },
+    }, mockEnv);
+    expect(analyticsRes.status).toBe(200);
+
+    const json = await analyticsRes.json<any>();
+    // Savings remains at 0 net retained (14k allocated - 14k out)
+    expect(json.summary.savings.net_retained).toBe(0);
+    expect(json.summary.savings.transfer_in).toBe(0);
+    expect(json.summary.savings.transfer_out).toBe(14000);
+
+    // Investment was: 14k allocated - 14k out + 5k in = 5k net retained!
+    expect(json.summary.invest.allocated).toBe(14000);
+    expect(json.summary.invest.transfer_out).toBe(14000);
+    expect(json.summary.invest.transfer_in).toBe(5000);
+    expect(json.summary.invest.net_retained).toBe(5000);
+
+    // Combined net retained is 5000
+    expect(json.summary.savings_invest_net).toBe(5000);
   });
 });

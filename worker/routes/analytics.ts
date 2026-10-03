@@ -133,44 +133,67 @@ analyticsApp.get('/breakdown', async (c) => {
   const netDelta = Math.round((totalInflow - totalOutflow) * 100) / 100;
   const transactionCount = summaryRaw?.transaction_count || 0;
 
-  // 2. Savings & Investment: Gross Waterfall Allocated vs. Inter-Bucket Net Retained
-  const savingsInvestRaw = await c.env.DB
+  // 2. Savings & Investment: Separated Waterfall Allocations & Inter-Bucket Transfers
+  const allocatedByBucketRaw = await c.env.DB
     .prepare(
-      `SELECT COALESCE(SUM(ar.amount), 0) as saved 
+      `SELECT 
+         b.key,
+         COALESCE(SUM(ar.amount), 0) as allocated
        FROM allocation_runs ar
        JOIN transactions t ON ar.transaction_id = t.id
        JOIN allocation_buckets b ON ar.bucket_id = b.id
        WHERE b.key IN ('savings', 'invest')
          AND ${whereClause}
-         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')`
+         AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
+       GROUP BY b.key`
     )
     .bind(periodParam)
-    .first<{ saved: number }>();
+    .all<{ key: string; allocated: number }>();
 
-  const savingsInvestAllocated = Math.round((savingsInvestRaw?.saved || 0) * 100) / 100;
+  let savingsAllocated = 0;
+  let investAllocated = 0;
+  for (const row of allocatedByBucketRaw?.results || []) {
+    if (row.key === 'savings') savingsAllocated = Math.round(row.allocated * 100) / 100;
+    if (row.key === 'invest') investAllocated = Math.round(row.allocated * 100) / 100;
+  }
+  const savingsInvestAllocated = Math.round((savingsAllocated + investAllocated) * 100) / 100;
 
   // Inter-bucket transfers on savings & invest buckets in this period
   const btDateClause = view === 'day' ? 'bt.date = ?' : view === 'year' ? "strftime('%Y', bt.date) = ?" : "strftime('%Y-%m', bt.date) = ?";
 
-  const savingsInvestTransfersRaw = await c.env.DB
+  const transfersByBucketRaw = await c.env.DB
     .prepare(
       `SELECT 
-         COALESCE(SUM(CASE WHEN tb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_in,
-         COALESCE(SUM(CASE WHEN fb.key IN ('savings', 'invest') THEN bt.amount ELSE 0 END), 0) as transfer_out
+         COALESCE(SUM(CASE WHEN tb.key = 'savings' THEN bt.amount ELSE 0 END), 0) as savings_in,
+         COALESCE(SUM(CASE WHEN fb.key = 'savings' THEN bt.amount ELSE 0 END), 0) as savings_out,
+         COALESCE(SUM(CASE WHEN tb.key = 'invest' THEN bt.amount ELSE 0 END), 0) as invest_in,
+         COALESCE(SUM(CASE WHEN fb.key = 'invest' THEN bt.amount ELSE 0 END), 0) as invest_out
        FROM bucket_transfers bt
        JOIN allocation_buckets fb ON bt.from_bucket_id = fb.id
        JOIN allocation_buckets tb ON bt.to_bucket_id = tb.id
        WHERE ${btDateClause}`
     )
     .bind(periodParam)
-    .first<{ transfer_in: number; transfer_out: number }>();
+    .first<{
+      savings_in: number;
+      savings_out: number;
+      invest_in: number;
+      invest_out: number;
+    }>();
+
+  const savingsTransferIn = Math.round((transfersByBucketRaw?.savings_in || 0) * 100) / 100;
+  const savingsTransferOut = Math.round((transfersByBucketRaw?.savings_out || 0) * 100) / 100;
+  const investTransferIn = Math.round((transfersByBucketRaw?.invest_in || 0) * 100) / 100;
+  const investTransferOut = Math.round((transfersByBucketRaw?.invest_out || 0) * 100) / 100;
 
   // Any direct expense debits on savings/invest buckets
   const bleDateClause = view === 'day' ? 'ble.date = ?' : view === 'year' ? "strftime('%Y', ble.date) = ?" : "strftime('%Y-%m', ble.date) = ?";
 
-  const directDebitsRaw = await c.env.DB
+  const debitsByBucketRaw = await c.env.DB
     .prepare(
-      `SELECT COALESCE(SUM(ble.amount), 0) as debits
+      `SELECT 
+         COALESCE(SUM(CASE WHEN b.key = 'savings' THEN ble.amount ELSE 0 END), 0) as savings_debits,
+         COALESCE(SUM(CASE WHEN b.key = 'invest' THEN ble.amount ELSE 0 END), 0) as invest_debits
        FROM bucket_ledger_entries ble
        JOIN allocation_buckets b ON ble.bucket_id = b.id
        WHERE b.key IN ('savings', 'invest')
@@ -178,15 +201,23 @@ analyticsApp.get('/breakdown', async (c) => {
          AND ${bleDateClause}`
     )
     .bind(periodParam)
-    .first<{ debits: number }>();
+    .first<{ savings_debits: number; invest_debits: number }>();
 
-  const transferIn = Math.round((savingsInvestTransfersRaw?.transfer_in || 0) * 100) / 100;
-  const transferOut = Math.round((savingsInvestTransfersRaw?.transfer_out || 0) * 100) / 100;
-  const directDebits = Math.round((directDebitsRaw?.debits || 0) * 100) / 100;
-  const savingsInvestNetRetained = Math.max(0, Math.round((savingsInvestAllocated + transferIn - transferOut - directDebits) * 100) / 100);
+  const savingsDebits = Math.round((debitsByBucketRaw?.savings_debits || 0) * 100) / 100;
+  const investDebits = Math.round((debitsByBucketRaw?.invest_debits || 0) * 100) / 100;
+
+  const savingsNetRetained = Math.max(0, Math.round((savingsAllocated + savingsTransferIn - savingsTransferOut - savingsDebits) * 100) / 100);
+  const investNetRetained = Math.max(0, Math.round((investAllocated + investTransferIn - investTransferOut - investDebits) * 100) / 100);
+
+  const totalTransferIn = Math.round((savingsTransferIn + investTransferIn) * 100) / 100;
+  const totalTransferOut = Math.round((savingsTransferOut + investTransferOut) * 100) / 100;
+  const savingsInvestNetRetained = Math.max(0, Math.round((savingsNetRetained + investNetRetained) * 100) / 100);
 
   const savingsGrossRate = totalInflow > 0 ? Math.round((savingsInvestAllocated / totalInflow) * 1000) / 10 : 0;
   const savingsNetRate = totalInflow > 0 ? Math.round((savingsInvestNetRetained / totalInflow) * 1000) / 10 : 0;
+
+  const savingsIndividualRate = totalInflow > 0 ? Math.round((savingsNetRetained / totalInflow) * 1000) / 10 : 0;
+  const investIndividualRate = totalInflow > 0 ? Math.round((investNetRetained / totalInflow) * 1000) / 10 : 0;
 
   // 3. Time Series Chart Data
   let timeSeries: Array<{ key: string; label: string; inflow: number; outflow: number; net: number }> = [];
@@ -533,12 +564,28 @@ analyticsApp.get('/breakdown', async (c) => {
       savings_invest_allocated: savingsInvestAllocated,
       savings_invest_gross_rate: savingsGrossRate,
       savings_invest_net: savingsInvestNetRetained,
-      savings_invest_transfers: Math.round((transferIn - transferOut) * 100) / 100,
-      savings_invest_transfers_out: transferOut,
-      savings_invest_transfers_in: transferIn,
+      savings_invest_transfers: Math.round((totalTransferIn - totalTransferOut) * 100) / 100,
+      savings_invest_transfers_out: totalTransferOut,
+      savings_invest_transfers_in: totalTransferIn,
       savings_invest_rate: savingsNetRate,
       transaction_count: transactionCount,
       transfer_count: rawTransfers?.length || 0,
+      savings: {
+        allocated: savingsAllocated,
+        transfer_in: savingsTransferIn,
+        transfer_out: savingsTransferOut,
+        debits: savingsDebits,
+        net_retained: savingsNetRetained,
+        rate: savingsIndividualRate,
+      },
+      invest: {
+        allocated: investAllocated,
+        transfer_in: investTransferIn,
+        transfer_out: investTransferOut,
+        debits: investDebits,
+        net_retained: investNetRetained,
+        rate: investIndividualRate,
+      },
     },
     time_series: timeSeries,
     expenses_by_category: expensesByCategory,

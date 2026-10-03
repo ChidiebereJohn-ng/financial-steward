@@ -25,6 +25,22 @@ interface BreakdownData {
     savings_invest_transfers_out?: number;
     savings_invest_transfers_in?: number;
     savings_invest_rate: number;
+    savings?: {
+      allocated: number;
+      transfer_in: number;
+      transfer_out: number;
+      debits: number;
+      net_retained: number;
+      rate: number;
+    };
+    invest?: {
+      allocated: number;
+      transfer_in: number;
+      transfer_out: number;
+      debits: number;
+      net_retained: number;
+      rate: number;
+    };
     transaction_count: number;
     transfer_count?: number;
   };
@@ -117,7 +133,7 @@ export const AnalyticsScreen: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [directionFilter, setDirectionFilter] = useState<'all' | 'inflow' | 'outflow' | 'transfer'>('all');
+  const [directionFilter, setDirectionFilter] = useState<'all' | 'inflow' | 'outflow' | 'transfer' | 'savings' | 'invest'>('all');
   const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
 
   // Load available historical periods (distinct years/months with transactions)
@@ -202,9 +218,22 @@ export const AnalyticsScreen: React.FC = () => {
   const filteredTransactions = useMemo(() => {
     if (!data) return [];
     return data.all_transactions.filter((tx) => {
-      if (directionFilter !== 'all' && tx.direction !== directionFilter) {
-        return false;
+      if (directionFilter === 'inflow' && tx.direction !== 'inflow') return false;
+      if (directionFilter === 'outflow' && tx.direction !== 'outflow') return false;
+      if (directionFilter === 'transfer' && tx.direction !== 'transfer') return false;
+      if (directionFilter === 'savings') {
+        const isSavings = tx.from_bucket_key === 'savings' || 
+          tx.to_bucket_key === 'savings' || 
+          (tx.category_name && tx.category_name.toLowerCase().includes('savings'));
+        if (!isSavings) return false;
       }
+      if (directionFilter === 'invest') {
+        const isInvest = tx.from_bucket_key === 'invest' || 
+          tx.to_bucket_key === 'invest' || 
+          (tx.category_name && tx.category_name.toLowerCase().includes('invest'));
+        if (!isInvest) return false;
+      }
+
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const noteMatch = tx.note?.toLowerCase().includes(query);
@@ -489,7 +518,7 @@ export const AnalyticsScreen: React.FC = () => {
       </div>
 
       {/* 3. Executive Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
         <KpiCard
           label="Total Inflows"
           value={formatNgn(data?.summary.total_inflow || 0)}
@@ -515,15 +544,39 @@ export const AnalyticsScreen: React.FC = () => {
         />
 
         <KpiCard
-          label={(data?.summary.savings_invest_transfers_out || 0) > 0 ? 'Savings & Invest (Retained)' : 'Savings & Investment'}
-          value={formatNgn(data?.summary.savings_invest_net ?? data?.summary.savings_invest_allocated ?? 0)}
+          label="Savings (Retained)"
+          value={formatNgn(data?.summary.savings?.net_retained ?? (data?.summary.savings_invest_net ? data.summary.savings_invest_net / 2 : 0))}
           subtext={
-            (data?.summary.savings_invest_transfers_out || 0) > 0
-              ? `${data?.summary.savings_invest_rate || 0}% retained (${formatNgn(data?.summary.savings_invest_allocated || 0)} gross · -${formatNgn(data?.summary.savings_invest_transfers_out || 0)} reallocated)`
-              : `${data?.summary.savings_invest_rate || 0}% stewardship allocation`
+            (data?.summary.savings?.transfer_in || 0) > 0 || (data?.summary.savings?.transfer_out || 0) > 0
+              ? `${data?.summary.savings?.rate || 0}% retained (${formatNgn(data?.summary.savings?.allocated || 0)} gross${(data?.summary.savings?.transfer_in || 0) > 0 ? ` +${formatNgn(data?.summary.savings?.transfer_in || 0)} in` : ''}${(data?.summary.savings?.transfer_out || 0) > 0 ? ` -${formatNgn(data?.summary.savings?.transfer_out || 0)} out` : ''})`
+              : `${data?.summary.savings?.rate || 0}% waterfall allocation (${formatNgn(data?.summary.savings?.allocated || 0)})`
           }
-          icon="🌱"
-          tone={(data?.summary.savings_invest_transfers_out || 0) > 0 && (data?.summary.savings_invest_net || 0) === 0 ? 'negative' : 'neutral'}
+          icon="🏦"
+          tone={
+            (data?.summary.savings?.transfer_out || 0) > 0 && (data?.summary.savings?.net_retained || 0) === 0
+              ? 'negative'
+              : (data?.summary.savings?.net_retained || 0) > 0
+              ? 'positive'
+              : 'neutral'
+          }
+        />
+
+        <KpiCard
+          label="Investment (Retained)"
+          value={formatNgn(data?.summary.invest?.net_retained ?? (data?.summary.savings_invest_net ? data.summary.savings_invest_net / 2 : 0))}
+          subtext={
+            (data?.summary.invest?.transfer_in || 0) > 0 || (data?.summary.invest?.transfer_out || 0) > 0
+              ? `${data?.summary.invest?.rate || 0}% retained (${formatNgn(data?.summary.invest?.allocated || 0)} gross${(data?.summary.invest?.transfer_in || 0) > 0 ? ` +${formatNgn(data?.summary.invest?.transfer_in || 0)} in` : ''}${(data?.summary.invest?.transfer_out || 0) > 0 ? ` -${formatNgn(data?.summary.invest?.transfer_out || 0)} out` : ''})`
+              : `${data?.summary.invest?.rate || 0}% waterfall allocation (${formatNgn(data?.summary.invest?.allocated || 0)})`
+          }
+          icon="📈"
+          tone={
+            (data?.summary.invest?.transfer_out || 0) > 0 && (data?.summary.invest?.net_retained || 0) === 0
+              ? 'negative'
+              : (data?.summary.invest?.net_retained || 0) > 0
+              ? 'positive'
+              : 'neutral'
+          }
         />
       </div>
 
@@ -929,6 +982,8 @@ export const AnalyticsScreen: React.FC = () => {
               <option value="inflow">Inflows Only</option>
               <option value="outflow">Expenses Only</option>
               <option value="transfer">⇄ Bucket Transfers Only</option>
+              <option value="savings">🏦 Savings Activity</option>
+              <option value="invest">📈 Investment Activity</option>
             </select>
           </div>
         </div>
