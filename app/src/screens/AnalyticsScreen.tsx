@@ -110,6 +110,8 @@ interface BreakdownData {
     to_bucket_name?: string;
     from_bucket_key?: string;
     to_bucket_key?: string;
+    bucket_name?: string;
+    bucket_key?: string;
   }>;
 }
 
@@ -224,12 +226,14 @@ export const AnalyticsScreen: React.FC = () => {
       if (directionFilter === 'savings') {
         const isSavings = tx.from_bucket_key === 'savings' || 
           tx.to_bucket_key === 'savings' || 
+          tx.bucket_key === 'savings' ||
           (tx.category_name && tx.category_name.toLowerCase().includes('savings'));
         if (!isSavings) return false;
       }
       if (directionFilter === 'invest') {
         const isInvest = tx.from_bucket_key === 'invest' || 
           tx.to_bucket_key === 'invest' || 
+          tx.bucket_key === 'invest' ||
           (tx.category_name && tx.category_name.toLowerCase().includes('invest'));
         if (!isInvest) return false;
       }
@@ -547,8 +551,8 @@ export const AnalyticsScreen: React.FC = () => {
           label="Savings (Retained)"
           value={formatNgn(data?.summary.savings?.net_retained ?? (data?.summary.savings_invest_net ? data.summary.savings_invest_net / 2 : 0))}
           subtext={
-            (data?.summary.savings?.transfer_in || 0) > 0 || (data?.summary.savings?.transfer_out || 0) > 0
-              ? `${data?.summary.savings?.rate || 0}% retained (${formatNgn(data?.summary.savings?.allocated || 0)} gross${(data?.summary.savings?.transfer_in || 0) > 0 ? ` +${formatNgn(data?.summary.savings?.transfer_in || 0)} in` : ''}${(data?.summary.savings?.transfer_out || 0) > 0 ? ` -${formatNgn(data?.summary.savings?.transfer_out || 0)} out` : ''})`
+            (data?.summary.savings?.transfer_in || 0) > 0 || (data?.summary.savings?.transfer_out || 0) > 0 || (data?.summary.savings?.debits || 0) > 0
+              ? `${data?.summary.savings?.rate || 0}% retained (${formatNgn(data?.summary.savings?.allocated || 0)} gross${(data?.summary.savings?.transfer_in || 0) > 0 ? ` +${formatNgn(data?.summary.savings?.transfer_in || 0)} in` : ''}${(data?.summary.savings?.transfer_out || 0) > 0 ? ` -${formatNgn(data?.summary.savings?.transfer_out || 0)} out` : ''}${(data?.summary.savings?.debits || 0) > 0 ? ` -${formatNgn(data?.summary.savings?.debits || 0)} deployed` : ''})`
               : `${data?.summary.savings?.rate || 0}% waterfall allocation (${formatNgn(data?.summary.savings?.allocated || 0)})`
           }
           icon="🏦"
@@ -565,8 +569,8 @@ export const AnalyticsScreen: React.FC = () => {
           label="Investment (Retained)"
           value={formatNgn(data?.summary.invest?.net_retained ?? (data?.summary.savings_invest_net ? data.summary.savings_invest_net / 2 : 0))}
           subtext={
-            (data?.summary.invest?.transfer_in || 0) > 0 || (data?.summary.invest?.transfer_out || 0) > 0
-              ? `${data?.summary.invest?.rate || 0}% retained (${formatNgn(data?.summary.invest?.allocated || 0)} gross${(data?.summary.invest?.transfer_in || 0) > 0 ? ` +${formatNgn(data?.summary.invest?.transfer_in || 0)} in` : ''}${(data?.summary.invest?.transfer_out || 0) > 0 ? ` -${formatNgn(data?.summary.invest?.transfer_out || 0)} out` : ''})`
+            (data?.summary.invest?.transfer_in || 0) > 0 || (data?.summary.invest?.transfer_out || 0) > 0 || (data?.summary.invest?.debits || 0) > 0
+              ? `${data?.summary.invest?.rate || 0}% retained (${formatNgn(data?.summary.invest?.allocated || 0)} gross${(data?.summary.invest?.transfer_in || 0) > 0 ? ` +${formatNgn(data?.summary.invest?.transfer_in || 0)} in` : ''}${(data?.summary.invest?.transfer_out || 0) > 0 ? ` -${formatNgn(data?.summary.invest?.transfer_out || 0)} out` : ''}${(data?.summary.invest?.debits || 0) > 0 ? ` -${formatNgn(data?.summary.invest?.debits || 0)} deployed` : ''})`
               : `${data?.summary.invest?.rate || 0}% waterfall allocation (${formatNgn(data?.summary.invest?.allocated || 0)})`
           }
           icon="📈"

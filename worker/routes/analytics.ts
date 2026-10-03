@@ -192,12 +192,22 @@ analyticsApp.get('/breakdown', async (c) => {
   const debitsByBucketRaw = await c.env.DB
     .prepare(
       `SELECT 
-         COALESCE(SUM(CASE WHEN b.key = 'savings' THEN ble.amount ELSE 0 END), 0) as savings_debits,
-         COALESCE(SUM(CASE WHEN b.key = 'invest' THEN ble.amount ELSE 0 END), 0) as invest_debits
+         COALESCE(SUM(CASE 
+           WHEN b.key = 'savings' AND ble.entry_type = 'expense_debit' THEN ble.amount 
+           WHEN b.key = 'savings' AND ble.entry_type = 'manual_adjustment' THEN -ble.amount
+           ELSE 0 
+         END), 0) as savings_debits,
+         COALESCE(SUM(CASE 
+           WHEN b.key = 'invest' AND ble.entry_type = 'expense_debit' THEN ble.amount 
+           WHEN b.key = 'invest' AND ble.entry_type = 'manual_adjustment' THEN -ble.amount
+           ELSE 0 
+         END), 0) as invest_debits
        FROM bucket_ledger_entries ble
        JOIN allocation_buckets b ON ble.bucket_id = b.id
+       LEFT JOIN transactions t ON ble.transaction_id = t.id
        WHERE b.key IN ('savings', 'invest')
-         AND ble.entry_type = 'expense_debit'
+         AND ble.entry_type IN ('expense_debit', 'manual_adjustment')
+         AND (t.id IS NULL OR t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
          AND ${bleDateClause}`
     )
     .bind(periodParam)
@@ -488,11 +498,15 @@ analyticsApp.get('/breakdown', async (c) => {
          i.name as income_source_name,
          a.name as account_name,
          t.note,
-         t.purpose_label
+         t.purpose_label,
+         b.name as bucket_name,
+         b.key as bucket_key
        FROM transactions t
        LEFT JOIN categories c ON t.category_id = c.id
        LEFT JOIN income_sources i ON t.income_source_id = i.id
        LEFT JOIN accounts a ON t.account_id = a.id
+       LEFT JOIN bucket_ledger_entries ble ON t.id = ble.transaction_id AND ble.entry_type = 'expense_debit'
+       LEFT JOIN allocation_buckets b ON ble.bucket_id = b.id
        WHERE ${whereClause}
          AND (t.note IS NULL OR t.note NOT LIKE '%[DELETED]%')
        ORDER BY t.date DESC, t.id DESC`

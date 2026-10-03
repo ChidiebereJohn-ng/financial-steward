@@ -355,4 +355,65 @@ describe('Analytics & Cash Flow Breakdown Endpoint Tests', () => {
     // Combined net retained is 5000
     expect(json.summary.savings_invest_net).toBe(5000);
   });
+
+  it('should exclude deleted transaction debits while accurately accounting for active investment debits', async () => {
+    // 1. Post an active expense debit on Investment bucket (id=4)
+    const expenseRes = await app.request('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
+      body: JSON.stringify({
+        date: '2026-10-20',
+        direction: 'outflow',
+        amount: 2000,
+        currency: 'NGN',
+        account_id: 1,
+        category_id: 8, // 'Seed' (flexible bucket category)
+        chosen_bucket_id: 4, // Directly debits investment bucket
+        note: 'Active paper asset investment',
+      }),
+    }, mockEnv);
+    expect(expenseRes.status).toBe(201);
+    const expJson = await expenseRes.json<any>();
+    const activeTxId = expJson.transaction.id;
+
+    // 2. Post another expense debit and delete it
+    const deletedExpRes = await app.request('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-dev-bypass': 'true' },
+      body: JSON.stringify({
+        date: '2026-10-21',
+        direction: 'outflow',
+        amount: 3000,
+        currency: 'NGN',
+        account_id: 1,
+        category_id: 8, // 'Seed'
+        chosen_bucket_id: 4,
+        note: 'Accidental investment outlay',
+      }),
+    }, mockEnv);
+    expect(deletedExpRes.status).toBe(201);
+    const delJson = await deletedExpRes.json<any>();
+    const delTxId = delJson.transaction.id;
+
+    // Delete it
+    const delRes = await app.request(`/api/transactions/${delTxId}`, {
+      method: 'DELETE',
+      headers: { 'x-dev-bypass': 'true' },
+    }, mockEnv);
+    expect(delRes.status).toBe(200);
+
+    // 3. Query Analytics Breakdown for 2026-10
+    const analyticsRes = await app.request('/api/analytics/breakdown?month=2026-10', {
+      method: 'GET',
+      headers: { 'x-dev-bypass': 'true' },
+    }, mockEnv);
+    expect(analyticsRes.status).toBe(200);
+
+    const json = await analyticsRes.json<any>();
+    // Prior investment retained was 5000.
+    // Active debit of 2000 reduces it to 3000.
+    // The deleted 3000 debit MUST NOT reduce it to 0!
+    expect(json.summary.invest.debits).toBe(2000);
+    expect(json.summary.invest.net_retained).toBe(3000);
+  });
 });
